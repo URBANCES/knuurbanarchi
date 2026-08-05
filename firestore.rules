@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "cces1022@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // CMS Collections: Public Read, Auth Write
+    match /research/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /projects/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /news/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /about/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /contact/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /members/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /memberCategories/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Users: Owner or Admin
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAuthenticated();
+    }
+  }
+}
+

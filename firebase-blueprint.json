@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "Post": {
+      "title": "Post",
+      "description": "Generic content structure for all categories",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "content": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "attachments": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string" }
+            }
+          }
+        },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorUid": { "type": "string" },
+        "agency": { "type": "string" },
+        "affiliation": { "type": "string" },
+        "agencyType": { "type": "string" },
+        "agency_type": { "type": "string" },
+        "principalInvestigator": { "type": "string" },
+        "coInvestigator": { "type": "string" },
+        "researchers": { "type": "string" },
+        "location": { "type": "string" },
+        "site": { "type": "string" },
+        "area": { "type": ["string", "number"] }
+      },
+      "required": ["title", "date", "category", "createdAt"]
+    },
+    "About": {
+      "title": "About",
+      "description": "Lab introduction content",
+      "type": "object",
+      "properties": {
+        "philosophy": { "type": "string" },
+        "history": { "type": "string" },
+        "team": { "type": "array" }
+      }
+    },
+    "Professor": {
+      "title": "Professor",
+      "description": "Professor's professional profile",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "image": { "type": "string" },
+        "introduction": { "type": "string" },
+        "specs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "content": { "type": "string" }
+            }
+          }
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "items": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "Footer": {
+      "title": "Footer",
+      "description": "Global footer configuration",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "copyright": { "type": "string" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["email", "role"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Lab research member profile",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "admissionMajor": { "type": "string" },
+        "startYear": { "type": "string" },
+        "endYear": { "type": "string" },
+        "email": { "type": "string" },
+        "majorHistory": { "type": "string" },
+        "thesisTitle": { "type": "string" },
+        "thesisUrl": { "type": "string" },
+        "currentCareer": { "type": "string" },
+        "image": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["name", "category", "status"]
+    },
+    "MemberCategory": {
+      "title": "MemberCategory",
+      "description": "Customizable academic degree category options for members",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["key", "label"]
+    }
+  },
+  "firestore": {
+    "/research/{id}": { "schema": "Post", "description": "Research publications" },
+    "/projects/{id}": { "schema": "Post", "description": "Architectural projects" },
+    "/news/{id}": { "schema": "Post", "description": "Lab news" },
+    "/about/content": { "schema": "About", "description": "About page content" },
+    "/about/professor": { "schema": "Professor", "description": "Professor's profile content" },
+    "/settings/footer": { "schema": "Footer", "description": "Global footer settings" },
+    "/contact/info": { "schema": "object", "description": "Contact information" },
+    "/users/{userId}": { "schema": "User", "description": "User roles" },
+    "/members/{id}": { "schema": "Member", "description": "Lab members directory" },
+    "/memberCategories/{id}": { "schema": "MemberCategory", "description": "Lab member degree process categories" }
+  }
+}
