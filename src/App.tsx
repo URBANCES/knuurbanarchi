@@ -34,6 +34,15 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Check sessionStorage for password auth token
+    const hasSessionToken = sessionStorage.getItem('isAdmin') === 'true' || !!sessionStorage.getItem('adminToken');
+    if (hasSessionToken) {
+      setIsAdmin(true);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Firebase Auth fallback check
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {

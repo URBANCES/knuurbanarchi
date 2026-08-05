@@ -79,6 +79,19 @@ export default function Admin() {
                 )}
               </li>
             ))}
+            <li className="pt-4 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  sessionStorage.removeItem('isAdmin');
+                  sessionStorage.removeItem('adminToken');
+                  window.location.href = '/login';
+                }}
+                className="w-full text-left px-4 py-3 text-xs font-bold tracking-widest uppercase text-red-500 hover:bg-red-50 transition-all border-l-2 border-transparent flex items-center justify-between"
+              >
+                <span>로그아웃 (Logout)</span>
+                <span>↳</span>
+              </button>
+            </li>
           </ul>
         </nav>
       </aside>
