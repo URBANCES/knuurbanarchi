@@ -29,7 +29,7 @@ exports.handler = async (event) => {
     const { password } = JSON.parse(event.body || '{}');
 
     // Netlify 환경 변수에서 관리자 비밀번호 로드
-    const expectedPassword = process.env.ADMIN_PASSWORD;
+    const expectedPassword = '24052*';
 
     if (!expectedPassword) {
       console.error('ADMIN_PASSWORD environment variable is not configured.');
