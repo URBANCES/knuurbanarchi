@@ -24,7 +24,7 @@ export default function Login() {
       // 1. Netlify Function으로 POST 검증 요청
       let res: Response;
       try {
-        res = await fetch('/.netlify/functions/login', {
+      res = await fetch('/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
