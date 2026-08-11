@@ -1,10 +1,8 @@
 {
-  "projectId": "gen-lang-client-0451594160",
-  "appId": "1:19646485606:web:395832b4b0719194b089a7",
-  "apiKey": "AIzaSyCuA1GkrHb6MdBAG57_Kghq7TEaLuNw8MY",
-  "authDomain": "gen-lang-client-0451594160.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-b3633f29-007d-4063-bd51-098a3993a799",
-  "storageBucket": "gen-lang-client-0451594160.firebasestorage.app",
-  "messagingSenderId": "19646485606",
-  "measurementId": ""
+  "projectId": "knuurbanarchi",
+  "appId": "1:623012047278:web:61ff43431477f94f3a003f",
+  "apiKey": "AIzaSyDqy1IPaUdqSOugoa4_c6bO5U-AOqN1L9M",
+  "authDomain": "knuurbanarchi.firebaseapp.com",
+  "storageBucket": "knuurbanarchi.firebasestorage.app",
+  "messagingSenderId": "623012047278"
 }
