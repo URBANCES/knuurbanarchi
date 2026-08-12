@@ -33,14 +33,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // ⭐️ 오직 파이어베이스의 강력한 신분증만 검사합니다!
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // 파이어베이스 정문을 통과한 사람이라면 무조건 프리패스! (관리자 권한 부여)
         setIsAdmin(true);
       } else {
-        // 로그인하지 않은 외부인
         setIsAdmin(false);
       }
       setLoading(false);
@@ -78,7 +75,13 @@ export default function App() {
               <Route path="/members/current" element={<Members defaultStatus="current" />} />
               <Route path="/members/graduate" element={<Members defaultStatus="graduate" />} />
               <Route path="/contact" element={<Contact />} />
-              <Route path="/login" element={<Login />} />
+              
+              {/* ⭐️ VIP 에스코트 규칙 추가! (이미 로그인된 사람이면 /admin으로 즉시 자동 이동) */}
+              <Route 
+                path="/login" 
+                element={isAdmin ? <Navigate to="/admin" replace /> : <Login />} 
+              />
+              
               <Route 
                 path="/admin/*" 
                 element={isAdmin ? <Admin /> : <Navigate to="/login" replace />} 
