@@ -1,8 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from './lib/firebase';
+import { auth } from './lib/firebase';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
@@ -34,29 +33,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Check sessionStorage for password auth token
-    const hasSessionToken = sessionStorage.getItem('isAdmin') === 'true' || !!sessionStorage.getItem('adminToken');
-    if (hasSessionToken) {
-      setIsAdmin(true);
-      setLoading(false);
-      return;
-    }
-
-    // 2. Firebase Auth fallback check
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        // Check if user is admin
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
-          setIsAdmin(true);
-        } else if (user.email === 'cces1022@gmail.com') {
-          // Default admin
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
+    // ⭐️ 오직 파이어베이스의 강력한 신분증만 검사합니다!
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // 파이어베이스 정문을 통과한 사람이라면 무조건 프리패스! (관리자 권한 부여)
+        setIsAdmin(true);
       } else {
+        // 로그인하지 않은 외부인
         setIsAdmin(false);
       }
       setLoading(false);
