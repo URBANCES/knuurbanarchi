@@ -1,12 +1,36 @@
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth'; // ⭐️ 파이어베이스 인증 시스템
+import { db, auth } from '../lib/firebase'; // ⭐️ 파이어베이스 통행증
+import { AnimatePresence } from 'motion/react';
+
+// 매니저 컴포넌트들
 import CMSManager from './admin/CMSManager';
 import SettingsManager from './admin/SettingsManager';
 import AboutManager from './admin/AboutManager';
 import MembersManager from './admin/MembersManager';
 import FooterManager from './admin/FooterManager';
+import BoardSettings from './admin/BoardSettings';
 
 export default function Admin() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true); // ⭐️ 신분증 검사 상태
+
+  // ⭐️ 파이어베이스 경비원 (신분증 검사 로직)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // 파이어베이스에 로그인된 사용자라면 통과!
+        setIsCheckingAuth(false);
+      } else {
+        // 로그인 안 된 외부인이면 로그인 페이지로 쫓아냅니다.
+        navigate('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
   const menuItems = [
     { name: '대시보드', path: '/admin' },
@@ -24,6 +48,15 @@ export default function Admin() {
     { name: '푸터 설정', path: '/admin/footer' },
     { name: '사이트 설정', path: '/admin/settings' },
   ];
+
+  // ⭐️ 신분증 검사 중일 때 보여줄 로딩 화면
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin"></span>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row gap-12">
@@ -81,10 +114,12 @@ export default function Admin() {
             ))}
             <li className="pt-4 border-t border-gray-100">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  // ⭐️ 로그아웃 시 파이어베이스에서도 안전하게 로그아웃 처리
+                  await signOut(auth);
                   sessionStorage.removeItem('isAdmin');
                   sessionStorage.removeItem('adminToken');
-                  window.location.href = '/login';
+                  navigate('/login');
                 }}
                 className="w-full text-left px-4 py-3 text-xs font-bold tracking-widest uppercase text-red-500 hover:bg-red-50 transition-all border-l-2 border-transparent flex items-center justify-between"
               >
@@ -173,12 +208,6 @@ function AdminDashboard() {
     </div>
   );
 }
-
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { useEffect, useState } from 'react';
-import BoardSettings from './admin/BoardSettings';
-import { AnimatePresence } from 'motion/react';
 
 function StatCard({ title, collectionName }: { title: string; collectionName: string }) {
   const [count, setCount] = useState<number | string>('--');
