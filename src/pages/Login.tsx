@@ -1,19 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { KeyRound, Eye, EyeOff, Lock, AlertCircle } from 'lucide-react';
+import { KeyRound, Eye, EyeOff, Lock, AlertCircle, Mail } from 'lucide-react'; // ⭐️ Mail 아이콘 추가
+import { signInWithEmailAndPassword } from 'firebase/auth'; // ⭐️ 파이어베이스 로그인 기능
+import { auth } from '../lib/firebase'; // ⭐️ 우리가 만든 통행증(firebase.ts) 불러오기
 
 export default function Login() {
+  const [email, setEmail] = useState(''); // ⭐️ 이메일 저장 공간 추가
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  // ⭐️ 파이어베이스 전용 로그인 검증 로직으로 완전히 교체
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password) {
-      setError('비밀번호를 입력해 주세요.');
+    
+    if (!email || !password) {
+      setError('이메일과 비밀번호를 모두 입력해 주세요.');
       return;
     }
 
@@ -21,57 +26,16 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // 1. Netlify Function으로 POST 검증 요청
-      let res: Response;
-      try {
-      res = await fetch('/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ password }),
-        });
-      } catch (e) {
-        // 백엔드 API 라우트 재시도 (/api/login)
-        res = await fetch('/api/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ password }),
-        });
-      }
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        // 2. 인증 성공 시 sessionStorage에 세션 저장
-        sessionStorage.setItem('isAdmin', 'true');
-        if (data.token) {
-          sessionStorage.setItem('adminToken', data.token);
-        }
-        // 3. CMS 관리자 페이지로 이동
-        window.location.href = '/admin';
-      } else {
-        // local dev environment fallback (for testing standard set password)
-        if (process.env.NODE_ENV !== 'production' && password === '24052*') {
-          sessionStorage.setItem('isAdmin', 'true');
-          sessionStorage.setItem('adminToken', 'local_dev_token');
-          window.location.href = '/admin';
-          return;
-        }
-
-        setError(data.error || '비밀번호가 올바르지 않습니다.');
-      }
+      // 파이어베이스 금고 문지기에게 이메일과 비밀번호 확인받기
+      await signInWithEmailAndPassword(auth, email, password);
+      
+      // 성공하면 세션에 기록하고 관리자 페이지로 이동
+      sessionStorage.setItem('isAdmin', 'true');
+      navigate('/admin');
+      
     } catch (err: any) {
-      // Local dev fallback if functions server is not running locally
-      if (password === '24052*') {
-        sessionStorage.setItem('isAdmin', 'true');
-        sessionStorage.setItem('adminToken', 'local_dev_token');
-        window.location.href = '/admin';
-        return;
-      }
-      setError('로그인 처리 중 오류가 발생했습니다. 다시 시도해 주세요.');
+      console.error(err);
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
     } finally {
       setLoading(false);
     }
@@ -102,7 +66,30 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handlePasswordLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6">
+          
+          {/* ⭐️ 새로 추가된 이메일 입력 칸 (기존 디자인 완벽 적용) */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400 block">
+              관리자 이메일 (Email)
+            </label>
+            <div className="relative flex items-center">
+              <div className="absolute left-4 text-gray-400">
+                <Mail className="w-4 h-4" />
+              </div>
+              <input 
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="관리자 이메일 주소 입력"
+                className="w-full pl-11 pr-4 py-4 border border-gray-200 focus:border-black outline-none text-sm transition-colors"
+                autoFocus
+                required
+              />
+            </div>
+          </div>
+
+          {/* 기존 비밀번호 입력 칸 */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400 block">
               관리자 비밀번호 (Password)
@@ -117,7 +104,6 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="관리자 전용 비밀번호 입력"
                 className="w-full pl-11 pr-12 py-4 border border-gray-200 focus:border-black outline-none text-sm transition-colors"
-                autoFocus
                 required
               />
               <button
@@ -146,11 +132,10 @@ export default function Login() {
 
         <div className="pt-4 border-t border-gray-100 text-center">
           <p className="text-[10px] text-gray-400 tracking-wider">
-            인증 시 sessionStorage에 안전하게 보안 세션이 저장됩니다.
+            파이어베이스 보안 시스템을 통해 안전하게 인증됩니다.
           </p>
         </div>
       </motion.div>
     </div>
   );
 }
-
