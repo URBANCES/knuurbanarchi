@@ -354,27 +354,20 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
     return newsConfig?.categories || ['Lab News', 'Announcement'];
   };
 
-  const checkFileSize = (file: File, inputElement?: HTMLInputElement | null): boolean => {
+ const checkFileSize = (file: File, inputElement?: HTMLInputElement | null): boolean => {
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-    if (file.size > 20 * 1024 * 1024) {
-      alert(`첨부 가능한 파일의 최대 크기는 20MB입니다. 현재 파일은 ${sizeInMB}MB로, 서버 무한 로딩을 방지하기 위해 업로드가 제한됩니다. 이미지 크기를 줄이거나 압축 후 다시 시도해 주세요.`);
+    const MAX_SIZE = 2 * 1024 * 1024; // 2MB 제한 설정
+
+    if (file.size > MAX_SIZE) {
+      alert(`사진 용량이 너무 큽니다! (현재: ${sizeInMB}MB)\n최대 2MB 이하의 이미지만 업로드 가능합니다. 이미지 크기를 줄이거나 압축 후 다시 시도해 주세요.`);
       if (inputElement) {
-        inputElement.value = '';
+        inputElement.value = ''; // 첨부 강제 취소
       }
       return false;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      const proceed = window.confirm(`첨부하신 파일의 용량이 커서 (${sizeInMB}MB) 업로드 완료까지 1분 이상 소요될 수 있습니다. 진행하시겠습니까?`);
-      if (!proceed) {
-        if (inputElement) {
-          inputElement.value = '';
-        }
-        return false;
-      }
-    }
-    return true;
+    return true; // 2MB 이하면 통과!
   };
-
+  
   const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -877,7 +870,7 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                     <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400 block">썸네일 및 첨부 이미지 (Thumbnail & Attachments)</label>
                     <p className="text-[9px] text-gray-400 font-medium">※ 리스트 좌측에 노출될 대표 이미지를 첨부 및 지정하세요 (권장 비율: 16:10).</p>
                     <p className="text-[9px] text-[#A3A3A3] font-medium leading-normal pt-1">
-                      * 최대 20MB 이하의 이미지 파일(PNG, JPG)만 첨부 가능합니다. (Max file size: 20MB)
+                      * 최대 2MB 이하의 이미지 파일(PNG, JPG)만 첨부 가능합니다. (Max file size: 2MB)
                     </p>
                   </div>
                   <div className="space-y-3">
