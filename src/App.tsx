@@ -73,6 +73,7 @@ export default function App() {
               <Route path="/professor" element={<Navigate to="/about" replace />} />
               <Route path="/members" element={<Members defaultStatus="all" />} />
               <Route path="/members/current" element={<Members defaultStatus="current" />} />
+              <Route path="/members/completed" element={<Members defaultStatus="completed" />} />
               <Route path="/members/graduate" element={<Members defaultStatus="graduate" />} />
               <Route path="/contact" element={<Contact />} />
               
