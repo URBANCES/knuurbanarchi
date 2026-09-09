@@ -134,6 +134,7 @@ export default function Header() {
       path: '/members',
       subItems: [
         { name: '재학생', path: '/members/current' },
+        { name: '수료생', path: '/members/completed' },
         { name: '졸업생', path: '/members/graduate' },
       ]
     },
