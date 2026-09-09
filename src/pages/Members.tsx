@@ -90,7 +90,7 @@ function getMemberPeriod(member: Member): string | null {
 }
 
 interface MembersProps {
-  defaultStatus?: 'current' | 'graduate' | 'all';
+  defaultStatus?: 'current' | 'graduate' | 'completed' | 'all';
 }
 
 export default function Members({ defaultStatus = 'current' }: MembersProps) {
@@ -176,10 +176,10 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
         <div className="flex flex-col md:flex-row justify-between items-baseline border-b border-gray-100 pb-8 gap-4">
           <div className="space-y-1">
             <h3 className="text-[10px] font-bold tracking-[0.4em] uppercase text-gray-400">
-              About / {isAllView ? 'All' : defaultStatus === 'graduate' ? 'Alumni' : 'Undergraduate'}
+              About / {isAllView ? 'All' : defaultStatus === 'graduate' ? 'Alumni' : defaultStatus === 'completed' ? 'Completed' : 'Undergraduate'}
             </h3>
             <h2 className="text-3xl font-bold tracking-tight uppercase">
-              {isAllView ? '전체 구성원' : defaultStatus === 'graduate' ? '졸업생' : '재학생'}
+              {isAllView ? '전체 구성원' : defaultStatus === 'graduate' ? '졸업생' : defaultStatus === 'completed' ? '수료생' : '재학생'}
             </h2>
           </div>
         </div>
