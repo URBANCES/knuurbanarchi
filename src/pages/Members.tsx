@@ -26,8 +26,11 @@ export function getCategoryPriority(category: string): number {
   if (norm === 'master' || norm.includes('master') || norm.includes('석사')) {
     return 4;
   }
-  if (norm === 'undergrad' || norm.includes('undergraduate') || norm.includes('학부')) {
+  if (norm.includes('산업대학원') || norm.includes('industry')) {
     return 5;
+  }
+  if (norm === 'undergrad' || norm.includes('undergraduate') || norm.includes('학부')) {
+    return 6;
   }
   return 100;
 }
@@ -38,6 +41,7 @@ export function getCategoryLabel(category: string): string {
   if (norm === 'researcher' || norm.includes('연구원') || norm.includes('researcher')) return '연구원';
   if (norm === 'doctor' || norm.includes('ph.d') || norm.includes('phd') || norm.includes('doctor') || norm.includes('박사')) return '박사과정';
   if (norm === 'master' || norm.includes('master') || norm.includes('석사')) return '석사과정';
+  if (norm.includes('산업대학원') || norm.includes('industry')) return '산업대학원';
   if (norm === 'undergrad' || norm.includes('undergraduate') || norm.includes('학부')) return '학부연구생';
   if (norm === 'professor' || norm.includes('교수')) return '교수';
   return category || '기타';
@@ -112,17 +116,22 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
       
       // Dynamic client-side sorting by status first (current > graduate),
       // then by categoryPriority and then internal order weight
-      fetched = fetched.sort((a, b) => {
-        const sA = a.status || 'current';
-        const sB = b.status || 'current';
-        if (sA === 'current' && sB === 'graduate') return -1;
-        if (sA === 'graduate' && sB === 'current') return 1;
-
+     fetched = fetched.sort((a, b) => {
+        // 1. 학위/과정(Category) 우선순위 비교 (박사 > 석사 > 산업대학원 > 학부)
         const pA = getCategoryPriority(a.category || '');
         const pB = getCategoryPriority(b.category || '');
         if (pA !== pB) return pA - pB;
 
-        return (a.order ?? 0) - (b.order ?? 0);
+        // 2. 입학년도(startYear) 비교 (오름차순: 과거 입학생부터 나열)
+        // 빈 값일 경우 에러를 막기 위해 임의의 큰 숫자(9999)로 처리하여 맨 뒤로 보냅니다.
+        const yearA = parseInt(a.startYear || '9999', 10);
+        const yearB = parseInt(b.startYear || '9999', 10);
+        if (yearA !== yearB) return yearA - yearB;
+
+        // 3. 이름(name) 자음/모음 가나다순 정렬 (localeCompare 사용)
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        return nameA.localeCompare(nameB, 'ko-KR');
       });
 
       setMembers(fetched);
