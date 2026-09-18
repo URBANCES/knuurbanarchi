@@ -221,97 +221,118 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
             <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : (
-          <AnimatePresence mode="wait">
+         <AnimatePresence mode="wait">
             <motion.div
               key={`${defaultStatus}-${activeTab}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className={
-                isAllView 
-                  ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2" 
-                  : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16"
-              }
+              className="space-y-16 w-full"
             >
               {finalFilteredMembers.length > 0 ? (
-                finalFilteredMembers.map((member, idx) => (
-                  <motion.div
-                    key={member.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.03 }}
-                    onClick={() => setSelectedMember(member)}
-                    className={
-                      isAllView
-                        ? "space-y-2.5 group bg-white border border-gray-100 p-2.5 flex flex-col justify-between hover:border-black/50 transition-all cursor-pointer hover:shadow-md"
-                        : "space-y-3 group cursor-pointer"
-                    }
-                  >
-                    <div>
-                      {/* Portrait Photo - Fixed 3:4 Aspect Ratio */}
-                      <div className="overflow-hidden bg-gray-50 border border-gray-100 relative aspect-[3/4]">
-                        {member.image ? (
-                          <img 
-                            src={member.image} 
-                            alt={member.name}
-                            className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300 uppercase tracking-widest">No Image</div>
-                        )}
-                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="text-[10px] font-bold text-white uppercase tracking-widest bg-black/70 px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                            상세보기 +
-                          </span>
-                        </div>
-                      </div>
+                // 전체보기일 경우 카테고리별로 그룹화, 아닐 경우 선택된 카테고리만 노출
+                (isAllView || activeTab === 'all' ? foundCategories : [activeTab]).map((cat) => {
+                  const membersInCat = finalFilteredMembers.filter(m => (m.category || 'master') === cat);
+                  if (membersInCat.length === 0) return null;
 
-                      {/* Member Information block - Flexbox Split (Left: Name, Course/Major; Right: Status, Period) */}
-                      <div className="pt-2.5 flex justify-between items-start gap-2">
-                        {/* Left Column */}
-                        <div className="flex-1 min-w-0 space-y-0.5 text-left">
-                          <h4 className="text-sm font-bold tracking-tight text-gray-900 truncate leading-snug group-hover:text-black transition-colors">
-                            {member.name}
-                          </h4>
-                          <p className="text-xs font-medium text-gray-500 truncate leading-normal">
-                            {getCategoryLabel(member.category || '')}
-                            {member.admissionMajor && (
-                              <span className="text-gray-500 font-normal"> / {normalizeAdmissionMajor(member.admissionMajor)}</span>
-                            )}
-                          </p>
-                          {member.email && (
-                            <p className="text-[10px] font-normal text-gray-400 truncate leading-normal">
-                              {member.email}
-                            </p>
-                          )}
+                  return (
+                    <div key={cat} className="space-y-6">
+                      
+                      {/* ⭐️ 그룹별 소제목 및 구분선 (전체보기 탭일 때만 노출) */}
+                      {(isAllView || activeTab === 'all') && (
+                        <div className="border-b border-gray-200 pb-2 mb-6">
+                          <h3 className="text-lg font-bold tracking-tight text-gray-900 uppercase">
+                            {getCategoryLabel(cat)}
+                          </h3>
                         </div>
+                      )}
 
-                        {/* Right Column */}
-                        <div className="flex-shrink-0 flex flex-col items-end text-right space-y-1">
-                          <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded-xs text-right whitespace-nowrap ${
-                            member.status === 'graduate' 
-                              ? 'bg-amber-50 text-amber-800 border border-amber-200/60' 
-                              : member.status === 'completed'
-                              ? 'bg-purple-50 text-purple-800 border border-purple-200/60'
-                              : 'bg-blue-50 text-blue-800 border border-blue-200/60'
-                          }`}>
-                            {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
-                          </span>
+                      {/* 해당 과정 구성원들의 그리드 */}
+                      <div className={
+                        isAllView 
+                          ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2" 
+                          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16"
+                      }>
+                        {membersInCat.map((member, idx) => (
+                          <motion.div
+                            key={member.id}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: idx * 0.03 }}
+                            onClick={() => setSelectedMember(member)}
+                            className={
+                              isAllView
+                                ? "space-y-2.5 group bg-white border border-gray-100 p-2.5 flex flex-col justify-between hover:border-black/50 transition-all cursor-pointer hover:shadow-md"
+                                : "space-y-3 group cursor-pointer"
+                            }
+                          >
+                            <div>
+                              {/* 프로필 이미지 */}
+                              <div className="overflow-hidden bg-gray-50 border border-gray-100 relative aspect-[3/4]">
+                                {member.image ? (
+                                  <img 
+                                    src={member.image} 
+                                    alt={member.name}
+                                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300 uppercase tracking-widest">No Image</div>
+                                )}
+                                <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <span className="text-[10px] font-bold text-white uppercase tracking-widest bg-black/70 px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                    상세보기 +
+                                  </span>
+                                </div>
+                              </div>
 
-                          {getMemberPeriod(member) && (
-                            <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap text-right">
-                              {getMemberPeriod(member)}
-                            </span>
-                          )}
-                        </div>
+                              {/* 정보 텍스트 (이름, 과정, 상태 등) */}
+                              <div className="pt-2.5 flex justify-between items-start gap-2">
+                                <div className="flex-1 min-w-0 space-y-0.5 text-left">
+                                  <h4 className="text-sm font-bold tracking-tight text-gray-900 truncate leading-snug group-hover:text-black transition-colors">
+                                    {member.name}
+                                  </h4>
+                                  <p className="text-xs font-medium text-gray-500 truncate leading-normal">
+                                    {getCategoryLabel(member.category || '')}
+                                    {member.admissionMajor && (
+                                      <span className="text-gray-500 font-normal"> / {normalizeAdmissionMajor(member.admissionMajor)}</span>
+                                    )}
+                                  </p>
+                                  {member.email && (
+                                    <p className="text-[10px] font-normal text-gray-400 truncate leading-normal">
+                                      {member.email}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="flex-shrink-0 flex flex-col items-end text-right space-y-1">
+                                  <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded-xs text-right whitespace-nowrap ${
+                                    member.status === 'graduate' 
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-200/60' 
+                                      : member.status === 'completed'
+                                      ? 'bg-purple-50 text-purple-800 border border-purple-200/60'
+                                      : 'bg-blue-50 text-blue-800 border border-blue-200/60'
+                                  }`}>
+                                    {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
+                                  </span>
+
+                                  {getMemberPeriod(member) && (
+                                    <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap text-right">
+                                      {getMemberPeriod(member)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
                       </div>
                     </div>
-                  </motion.div>
-                ))
+                  );
+                })
               ) : (
-                <div className="col-span-full py-24 text-center border border-dashed border-gray-100">
+                <div className="w-full py-24 text-center border border-dashed border-gray-100">
                   <p className="text-xs text-gray-300 uppercase tracking-widest">해당 과정의 구성원이 없습니다.</p>
                 </div>
               )}
