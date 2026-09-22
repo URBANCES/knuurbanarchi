@@ -23,9 +23,13 @@ export default function Research() {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const activeTab = searchParams.get('category') || 'all'; // 'all', 'thesis', 'journal'
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8; // 리스트형 = 8개
+
+  const activeTab = searchParams.get('category') || 'all'; 
 
   const setActiveTab = (tab: string) => {
+    setCurrentPage(1); //
     if (tab === 'all') {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('category');
@@ -199,65 +203,100 @@ export default function Research() {
       </div>
 
       {/* Combined List Section */}
-      <div className="divide-y divide-gray-100 px-4 md:px-12">
-        <AnimatePresence mode="popLayout">
-          {filteredItems.length > 0 ? (
-            filteredItems.map((item, idx) => (
-              <motion.div
-                key={item.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-                onClick={() => handleItemClick(item.url)}
-                className={`flex flex-col md:flex-row justify-between items-start md:items-center py-6 gap-6 group transition-all hover:bg-gray-50/50 ${item.url ? 'cursor-pointer' : ''}`}
-              >
-                {/* Left Area: Title & Author (Indented) */}
-                <div className="space-y-2.5 max-w-3xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold tracking-wider text-black border border-black/15 bg-gray-50 px-2 py-0.5 uppercase">
-                      {getCategoryLabel(item.category)}
-                    </span>
-                  </div>
-                  <h4 className="text-[1.1rem] font-bold tracking-tight leading-snug group-hover:text-black transition-colors break-words">
-                    {item.title}
-                  </h4>
-                  {item.titleEn && (
-                    <p className="text-[0.95rem] text-gray-500 font-normal leading-snug break-words">
-                      {item.titleEn}
-                    </p>
-                  )}
-                  {item.author && (
-                    <p className="text-[0.9rem] text-gray-500 font-normal">
-                      {item.author}
-                    </p>
-                  )}
-                </div>
-
-                {/* Right Area: Year & Institution (Compact) */}
-                <div className="text-right space-y-0.5 w-full md:w-auto">
-                  <p className="text-[0.85rem] font-normal text-gray-500 whitespace-nowrap">
-                    게재년도 | <span className="font-semibold text-black">{item.year}</span>
-                  </p>
-                  <p className="text-[0.85rem] font-normal text-gray-400">
-                    {item.affiliation}
-                  </p>
-                  {item.url && (
-                    <div className="flex justify-end pt-1">
-                      <span className="text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest bg-black text-white px-2 py-0.5">Link +</span>
+      {/* Combined List Section & Pagination */}
+      <div className="px-4 md:px-12">
+        <div className="divide-y divide-gray-100">
+          <AnimatePresence mode="popLayout">
+            {filteredItems.length > 0 ? (
+              // ⭐️ 자르기 로직 적용!
+              filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  onClick={() => handleItemClick(item.url)}
+                  className={`flex flex-col md:flex-row justify-between items-start md:items-center py-6 gap-6 group transition-all hover:bg-gray-50/50 ${item.url ? 'cursor-pointer' : ''}`}
+                >
+                  {/* ... (기존 아이템 렌더링 코드 유지 - title, author 등) ... */}
+                  {/* Left Area: Title & Author (Indented) */}
+                  <div className="space-y-2.5 max-w-3xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-bold tracking-wider text-black border border-black/15 bg-gray-50 px-2 py-0.5 uppercase">
+                        {getCategoryLabel(item.category)}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </motion.div>
-            ))
-          ) : (
-            <div className="py-24 text-center text-gray-400 text-xs uppercase tracking-widest border border-dashed border-gray-100 italic">
-              등록된 콘텐츠가 없습니다.
-            </div>
-          )}
-        </AnimatePresence>
+                    <h4 className="text-[1.1rem] font-bold tracking-tight leading-snug group-hover:text-black transition-colors break-words">
+                      {item.title}
+                    </h4>
+                    {item.titleEn && (
+                      <p className="text-[0.95rem] text-gray-500 font-normal leading-snug break-words">
+                        {item.titleEn}
+                      </p>
+                    )}
+                    {item.author && (
+                      <p className="text-[0.9rem] text-gray-500 font-normal">
+                        {item.author}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Right Area: Year & Institution (Compact) */}
+                  <div className="text-right space-y-0.5 w-full md:w-auto">
+                    <p className="text-[0.85rem] font-normal text-gray-500 whitespace-nowrap">
+                      게재년도 | <span className="font-semibold text-black">{item.year}</span>
+                    </p>
+                    <p className="text-[0.85rem] font-normal text-gray-400">
+                      {item.affiliation}
+                    </p>
+                    {item.url && (
+                      <div className="flex justify-end pt-1">
+                        <span className="text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest bg-black text-white px-2 py-0.5">Link +</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="py-24 text-center text-gray-400 text-xs uppercase tracking-widest border border-dashed border-gray-100 italic">
+                등록된 콘텐츠가 없습니다.
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* ⭐️ 페이지네이션 UI 추가 */}
+        {filteredItems.length > itemsPerPage && (
+          <div className="flex justify-center items-center gap-3 pt-16">
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
+            >
+              &lt;
+            </button>
+            {Array.from({ length: Math.ceil(filteredItems.length / itemsPerPage) }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`w-8 h-8 flex items-center justify-center text-[10px] font-bold border transition-all cursor-pointer ${
+                  currentPage === i + 1 
+                    ? 'border-black bg-black text-white' 
+                    : 'border-transparent text-gray-400 hover:text-black hover:border-gray-200'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredItems.length / itemsPerPage)))}
+              disabled={currentPage === Math.ceil(filteredItems.length / itemsPerPage)}
+              className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
+            >
+              &gt;
+            </button>
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
