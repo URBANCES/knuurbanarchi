@@ -47,11 +47,9 @@ export default function Projects() {
   };
 
   useEffect(() => {
-    // Fetch all published projects
     const q = query(
       collection(db, 'projects'),
-      where('isPublished', '==', true),
-      orderBy('year', 'desc')
+      where('isPublished', '==', true)
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -59,6 +57,13 @@ export default function Projects() {
         id: doc.id,
         ...doc.data()
       })) as ProjectItem[];
+
+      // ⭐️ 클라이언트 측에서 연도 기준 내림차순 정렬 (최신순)
+      fetchedProjects.sort((a, b) => {
+        const yearA = parseInt(a.year) || 0;
+        const yearB = parseInt(b.year) || 0;
+        return yearB - yearA;
+      });
 
       for (const item of fetchedProjects) {
         if (!item.category || item.category === '' || item.category === '미분류' || item.category === 'unclassified') {
@@ -85,6 +90,7 @@ export default function Projects() {
             await updateDoc(doc(db, 'projects', item.id), {
               category: correctedCategory
             });
+            console.log(`Successfully healed project item [${item.title}] with category: ${correctedCategory}`);
           } catch (err) {
             console.error('Failed to auto-heal project document:', err);
           }
