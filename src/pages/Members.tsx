@@ -103,6 +103,10 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // ⭐️ 프론트 검색용 상태 추가
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   useEffect(() => {
     // Listen to all member documents in database
     const q = query(
@@ -114,21 +118,15 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
     const unsub = onSnapshot(q, (snapshot) => {
       let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member));
       
-      // Dynamic client-side sorting by status first (current > graduate),
-      // then by categoryPriority and then internal order weight
-     fetched = fetched.sort((a, b) => {
-        // 1. 학위/과정(Category) 우선순위 비교 (박사 > 석사 > 산업대학원 > 학부)
+      fetched = fetched.sort((a, b) => {
         const pA = getCategoryPriority(a.category || '');
         const pB = getCategoryPriority(b.category || '');
         if (pA !== pB) return pA - pB;
 
-        // 2. 입학년도(startYear) 비교 (오름차순: 과거 입학생부터 나열)
-        // 빈 값일 경우 에러를 막기 위해 임의의 큰 숫자(9999)로 처리하여 맨 뒤로 보냅니다.
         const yearA = parseInt(a.startYear || '9999', 10);
         const yearB = parseInt(b.startYear || '9999', 10);
         if (yearA !== yearB) return yearA - yearB;
 
-        // 3. 이름(name) 자음/모음 가나다순 정렬 (localeCompare 사용)
         const nameA = a.name || '';
         const nameB = b.name || '';
         return nameA.localeCompare(nameB, 'ko-KR');
@@ -141,21 +139,17 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
     return () => unsub();
   }, []);
 
-  // 1. Filter members belonging to requested mode (current, graduate, or all)
   const statusFilteredMembers = members.filter(member => {
     if (defaultStatus === 'all') return true;
     const statusOfMember = member.status || 'current';
     return statusOfMember === defaultStatus;
   });
 
-  // 2. Extract unique categories present within statusFilteredMembers for the tab switcher
   const foundCategories = Array.from(new Set(statusFilteredMembers.map(m => m.category || 'master')))
     .sort((a, b) => getCategoryPriority(a) - getCategoryPriority(b));
 
-  // Prepend 'all' tab dynamically to let users view all courses in this category combined
   const uniqueCategories = ['all', ...foundCategories];
 
-  // Determine dynamic active tab, defaulting search parameter or 'all' if not set
   const rawQueryCategory = searchParams.get('category');
   const activeTab = rawQueryCategory || 'all';
 
@@ -171,7 +165,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
 
   const isAllView = defaultStatus === 'all';
 
-  // Filter members specifically matching the active tab selection
   const finalFilteredMembers = statusFilteredMembers.filter(member => {
     if (isAllView || activeTab === 'all') return true;
     const rawCat = member.category || 'master';
@@ -193,9 +186,59 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
           </div>
         </div>
 
+        {/* ⭐️ 프론트 스마트 검색창 추가 (띄어쓰기 무관) */}
+        <div className="relative z-[40] w-full max-w-xl">
+          <div className="flex items-center border-b-2 border-gray-200 focus-within:border-black transition-colors bg-transparent pb-3">
+            <span className="pr-3 text-gray-400">🔍</span>
+            <input 
+              type="text"
+              placeholder="구성원 이름 검색 (띄어쓰기 무관)"
+              className="w-full bg-transparent outline-none text-sm font-sans"
+              value={searchTerm}
+              onChange={e => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            />
+          </div>
+          
+          <AnimatePresence>
+            {showSuggestions && searchTerm && (
+              <motion.div 
+                initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-2 max-h-80 overflow-y-auto z-50"
+              >
+                {(() => {
+                  const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
+                  const queryStr = normalize(searchTerm);
+                  const matches = members.filter(member => normalize(member.name).includes(queryStr));
+                  
+                  if (matches.length === 0) return <div className="p-4 text-xs text-gray-400 text-center tracking-widest">검색 결과가 없습니다.</div>;
+                  
+                  return matches.map(member => (
+                    <div 
+                      key={member.id}
+                      onClick={() => {
+                        setSelectedMember(member); // 클릭 시 해당 구성원 프로필 모달 오픈
+                        setSearchTerm('');
+                      }}
+                      className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer flex justify-between items-center group transition-colors"
+                    >
+                       <div>
+                         <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{member.name}</p>
+                         <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{getCategoryLabel(member.category || '')} | {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}</p>
+                       </div>
+                       <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">프로필 보기 ↗</span>
+                    </div>
+                  ));
+                })()}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Dynamic Horizontal Tab Menu */}
         {!isAllView && foundCategories.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-start">
+          <div className="flex flex-wrap gap-2 justify-start pt-4">
             {uniqueCategories.map(cat => (
               <button
                 key={cat}
@@ -203,8 +246,8 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                 onClick={() => handleTabChange(cat)}
                 className={`px-8 py-3 text-xs font-bold tracking-widest uppercase transition-all duration-300 cursor-pointer ${
                   activeTab === cat 
-                  ? 'bg-[#333333] text-white shadow-lg' 
-                  : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                    ? 'bg-[#333333] text-white shadow-lg' 
+                    : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
                 }`}
               >
                 {cat === 'all' ? '전체보기' : getCategoryLabel(cat)}
@@ -231,7 +274,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
               className="space-y-16 w-full"
             >
               {finalFilteredMembers.length > 0 ? (
-                // 전체보기일 경우 카테고리별로 그룹화, 아닐 경우 선택된 카테고리만 노출
                 (isAllView || activeTab === 'all' ? foundCategories : [activeTab]).map((cat) => {
                   const membersInCat = finalFilteredMembers.filter(m => (m.category || 'master') === cat);
                   if (membersInCat.length === 0) return null;
@@ -239,7 +281,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                   return (
                     <div key={cat} className="space-y-6">
                       
-                      {/* ⭐️ 그룹별 소제목 및 구분선 (전체보기 탭일 때만 노출) */}
                       {(isAllView || activeTab === 'all') && (
                         <div className="border-b border-gray-200 pb-2 mb-6">
                           <h3 className="text-lg font-bold tracking-tight text-gray-900 uppercase">
@@ -248,7 +289,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                         </div>
                       )}
 
-                      {/* 해당 과정 구성원들의 그리드 */}
                       <div className={
                         isAllView 
                           ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2" 
@@ -268,7 +308,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                             }
                           >
                             <div>
-                              {/* 프로필 이미지 */}
                               <div className="overflow-hidden bg-gray-50 border border-gray-100 relative aspect-[3/4]">
                                 {member.image ? (
                                   <img 
@@ -287,7 +326,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                                 </div>
                               </div>
 
-                              {/* 정보 텍스트 (이름, 과정, 상태 등) */}
                               <div className="pt-2.5 flex justify-between items-start gap-2">
                                 <div className="flex-1 min-w-0 space-y-0.5 text-left">
                                   <h4 className="text-sm font-bold tracking-tight text-gray-900 truncate leading-snug group-hover:text-black transition-colors">
@@ -337,7 +375,7 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                 </div>
               )}
             </motion.div>
-          </AnimatePresence>
+         </AnimatePresence>
         )}
       </div>
 
@@ -356,7 +394,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
               onClick={(e) => e.stopPropagation()}
               className="bg-white p-6 md:p-8 max-w-2xl w-full border border-gray-100 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto"
             >
-              {/* Close Button */}
               <button 
                 type="button"
                 onClick={() => setSelectedMember(null)}
@@ -368,7 +405,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                 </svg>
               </button>
 
-              {/* Modal Title & Basic Info Header */}
               <div className="border-b border-gray-100 pb-4 pr-10">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <h3 className="text-2xl font-bold tracking-tight text-gray-900">{selectedMember.name}</h3>
@@ -393,9 +429,7 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                 </p>
               </div>
 
-              {/* 2-Column Responsive Body Layout (Stack on mobile, Left-Right on desktop) */}
               <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
-                {/* [Left Area]: Profile Image */}
                 <div className="w-full md:w-52 shrink-0 aspect-[3/4] bg-gray-50 border border-gray-100 overflow-hidden relative rounded-xs">
                   {selectedMember.image ? (
                     <img 
@@ -411,9 +445,7 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                   )}
                 </div>
 
-                {/* [Right Area]: Detailed Text Info listed in exact top-to-bottom order */}
                 <div className="flex-1 space-y-4 w-full text-left">
-                  {/* 1. 이메일 */}
                   {selectedMember.email?.trim() && (
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">이메일</span>
@@ -429,7 +461,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                     </div>
                   )}
 
-                  {/* 2. 전공 이력 */}
                   {selectedMember.majorHistory?.trim() && (
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">전공 이력</span>
@@ -439,7 +470,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                     </div>
                   )}
 
-                  {/* 3. 졸업 논문 */}
                   {selectedMember.thesisTitle?.trim() && (
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">졸업 논문</span>
@@ -449,7 +479,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                     </div>
                   )}
 
-                  {/* 4. 졸업논문링크 */}
                   {selectedMember.thesisUrl?.trim() && (
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">졸업논문링크</span>
@@ -467,7 +496,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                     </div>
                   )}
 
-                  {/* 5. 현재 경력 상태 */}
                   {selectedMember.currentCareer?.trim() && (
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">현재 경력 상태</span>
@@ -477,7 +505,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                     </div>
                   )}
 
-                  {/* Fallback if no extra details are registered */}
                   {!selectedMember.email?.trim() && 
                    !selectedMember.majorHistory?.trim() && 
                    !selectedMember.thesisTitle?.trim() && 
@@ -490,7 +517,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                 </div>
               </div>
 
-              {/* Bottom Footer Close Button */}
               <div className="pt-4 border-t border-gray-100 flex justify-end">
                 <button 
                   type="button"
