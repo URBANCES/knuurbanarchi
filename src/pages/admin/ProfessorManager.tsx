@@ -116,6 +116,21 @@ export default function ProfessorManager() {
     setData({ ...data, specs: newSpecs });
   };
 
+const addSpec = () => {
+    setData({
+      ...data,
+      specs: [...data.specs, { label: '새 스펙', content: '' }]
+    });
+  };
+
+  const removeSpec = (index: number) => {
+    if (confirm('이 스펙을 삭제하시겠습니까?')) {
+      const newSpecs = [...data.specs];
+      newSpecs.splice(index, 1);
+      setData({ ...data, specs: newSpecs });
+    }
+  };
+  
   const addSection = () => {
     setData({
       ...data,
@@ -204,10 +219,30 @@ export default function ProfessorManager() {
           </div>
 
           <div className="space-y-4 pt-10 border-t border-gray-50">
-            <h3 className="text-[10px] font-bold tracking-widest uppercase text-gray-400">02 / 주요 스펙 (좌측 하단 배치)</h3>
+            {/* ⭐️ 상단 제목 + 스펙 추가 버튼 */}
+            <div className="flex justify-between items-center">
+              <h3 className="text-[10px] font-bold tracking-widest uppercase text-gray-400">02 / 주요 스펙 (좌측 하단 배치)</h3>
+              <button 
+                type="button"
+                onClick={addSpec}
+                className="text-[10px] font-bold text-black border-b border-black hover:opacity-50 transition-opacity cursor-pointer"
+              >
+                + 스펙 추가
+              </button>
+            </div>
+            
             <div className="space-y-8">
               {data.specs.map((spec, idx) => (
-                <div key={idx} className="p-6 border border-gray-50 space-y-4 bg-gray-50/30">
+                <div key={idx} className="p-6 border border-gray-50 space-y-4 bg-gray-50/30 relative group">
+                  {/* ⭐️ 삭제 버튼(마우스 올리면 나타남) */}
+                  <button 
+                    type="button"
+                    onClick={() => removeSpec(idx)}
+                    className="absolute top-4 right-4 text-[10px] font-bold text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:underline cursor-pointer"
+                  >
+                    REMOVE
+                  </button>
+
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase">스펙 제목 (BOLD)</label>
                     <input 
