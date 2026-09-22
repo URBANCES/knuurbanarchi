@@ -8,6 +8,7 @@ export default function SettingsManager() {
     themeColor: '#000000',
     mainFont: 'Pretendard',
     logoUrl: '',
+    mainBannerUrl: '',
     backgroundColor: '#FFFFFF'
   });
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,33 @@ export default function SettingsManager() {
     } else {
       setSettings(prev => ({ ...prev, logoUrl: result.url }));
       alert('로고 이미지가 성공적으로 임시 업로드되었습니다. 아래의 [설정 저장하기] 버튼을 누르시면 최종 반영됩니다.');
+    }
+  };
+
+  const handleBannerUpload = async (file: File, inputId?: string) => {
+    // 2MB 용량 제한 체크
+    if (!checkFileSize(file, inputId)) return;
+
+    const storagePath = `settings/banner_${Date.now()}_${file.name}`;
+    const result = await uploadImageWithFallback(file, storagePath, setUploading);
+    
+    if (result.error) {
+      if (result.isBase64Fallback) {
+        setSettings(prev => ({ ...prev, mainBannerUrl: result.url }));
+        alert(`${result.error}\n\n* 안정성 확보를 위해 배너를 로컬 데이터로 임시 저장했습니다. [설정 저장하기]를 클릭하세요.`);
+      } else {
+        alert(`배너 업로드 제한: ${result.error}`);
+      }
+    } else {
+      setSettings(prev => ({ ...prev, mainBannerUrl: result.url }));
+      alert('배너 이미지가 성공적으로 임시 업로드되었습니다. 아래의 [설정 저장하기] 버튼을 누르시면 최종 반영됩니다.');
+    }
+  };
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleBannerUpload(file, 'banner-file-input');
     }
   };
 
@@ -129,6 +157,40 @@ export default function SettingsManager() {
             />
           </div>
         </div>
+        {/* ⭐️ 메인 배너 업로드 섹션 추가 */}
+        <div className="space-y-4 pt-8 border-t border-gray-100">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">메인 배너 이미지 (Main Banner Image)</label>
+            <div className="flex gap-4 items-end">
+              <div className="flex-grow space-y-2">
+                <input 
+                  type="text" 
+                  className="w-full p-3 bg-white border border-gray-200 text-sm focus:outline-none focus:border-black"
+                  value={settings.mainBannerUrl}
+                  onChange={e => setSettings({...settings, mainBannerUrl: e.target.value})}
+                  placeholder="이미지를 첨부하거나 URL을 직접 입력하세요."
+                />
+              </div>
+              <label className="flex-shrink-0 px-6 py-3 bg-black text-white text-[10px] font-bold tracking-widest uppercase hover:bg-gray-800 transition-colors cursor-pointer text-center">
+                {uploading ? '업로드 중...' : '이미지 첨부'}
+                <input 
+                  id="banner-file-input"
+                  type="file" 
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleBannerFileChange}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
+            {settings.mainBannerUrl && (
+              <div className="mt-4 aspect-[21/9] w-full border border-gray-100 overflow-hidden rounded bg-gray-50">
+                <img src={settings.mainBannerUrl} className="w-full h-full object-cover grayscale opacity-90" alt="Banner Preview" />
+              </div>
+            )}
+          </div>
+        </div>
+        {/* ⭐️ 메인 배너 섹션 끝 */}
 
         <div className="space-y-2">
           <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">Background Color</label>
