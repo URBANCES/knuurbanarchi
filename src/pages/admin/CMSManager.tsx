@@ -56,6 +56,8 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingFiles, setPendingFiles] = useState<{ [index: number]: File }>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8; // 1페이지당 보여줄 개수 (리스트형 = 8개)
 
   // News configuration states (intro description and categories)
   const [newsConfig, setNewsConfig] = useState<any>(null);
@@ -1101,13 +1103,23 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
         </motion.div>
       )}
 
+      {/* ⭐️ 여기서부터 추가 */}
+      {(() => {
+        const totalPages = Math.ceil(posts.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const currentPosts = posts.slice(startIndex, startIndex + itemsPerPage);
+
+        return (
+          <>
+      {/* ⭐️ 여기까지 추가 */}
+            
       <div className="grid gap-4">
         {loading ? (
           <div className="text-center py-24 text-gray-300 text-[10px] font-bold uppercase tracking-widest">Loading Items...</div>
         ) : posts.length === 0 ? (
           <div className="text-center py-24 border border-dashed border-gray-200 text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Posts Found</div>
         ) : (
-          posts.map(post => (
+          currentPosts.map(post => (
             <div key={post.id} className="flex items-center justify-between p-6 border border-gray-100 bg-white hover:border-black transition-all group">
               <div className="flex items-center gap-6">
                 <div className="w-16 h-16 bg-gray-50 overflow-hidden flex-shrink-0 border border-gray-100">
@@ -1180,6 +1192,43 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
         )}
       </div>
 
+{/* ⭐️ 여기서부터 추가 (페이지네이션 UI) */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 pt-8">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all"
+                >
+                  &lt;
+                </button>
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-8 h-8 flex items-center justify-center text-[10px] font-bold border transition-all ${
+                      currentPage === i + 1 
+                        ? 'border-black bg-black text-white' 
+                        : 'border-transparent text-gray-400 hover:text-black hover:border-gray-200'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all"
+                >
+                  &gt;
+                </button>
+              </div>
+            )}
+          </>
+        );
+      })()}
+      {/* ⭐️ 여기까지 추가 끝 */}
+            
       {showSuccess && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[300] bg-black text-white px-8 py-4 text-[10px] font-bold tracking-widest uppercase shadow-2xl">
           {successMessage}
