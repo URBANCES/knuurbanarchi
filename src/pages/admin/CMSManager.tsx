@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, storage } from '../../lib/firebase';
 import { uploadImageWithFallback } from '../../lib/uploadHelper';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Post {
   id: string;
@@ -13,7 +13,7 @@ interface Post {
   agency?: string;
   agencyType?: string;
   agency_type?: string;
-  subtitle?: string; // Explicit subtitle for news summary
+  subtitle?: string;
   year: string;
   content: string;
   thumbnail: string;
@@ -56,13 +56,14 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingFiles, setPendingFiles] = useState<{ [index: number]: File }>({});
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8; // 1페이지당 보여줄 개수 (리스트형 = 8개)
+
+  // 검색 및 페이지네이션용 상태 추가
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8; // 1페이지당 8개 노출
 
-  // News configuration states (intro description and categories)
+  // News configuration states
   const [newsConfig, setNewsConfig] = useState<any>(null);
   const [introText, setIntroText] = useState('');
   const [savingIntro, setSavingIntro] = useState(false);
@@ -142,23 +143,18 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
     const currentCats = newsConfig?.categories || ['Lab News', 'Announcement'];
     const updatedCats = currentCats.filter((c: string) => c !== catToDelete);
     try {
-      // 1. Find all news items targeting this category and migrate them to '전체'
       const postsToMigrate = posts.filter(post => post.category === catToDelete);
-      
       const migratePromises = postsToMigrate.map(post => 
         updateDoc(doc(db, collectionName, post.id), { category: '전체' })
       );
       await Promise.all(migratePromises);
 
-      // 2. Delete the category from boardConfig
       await setDoc(doc(db, 'boardConfigs', 'news'), {
         ...newsConfig,
         categories: updatedCats
       }, { merge: true });
 
       setConfirmDeleteCat(null);
-
-      // Show success toast
       setSuccessMessage(`카테고리 "${catToDelete}"가 삭제되고 소속 게시글이 '전체'로 안전하게 이동되었습니다.`);
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
@@ -196,7 +192,6 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
     }
   };
 
-  // Load primary collection posts
   useEffect(() => {
     const q = query(collection(db, collectionName), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -223,7 +218,6 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
 
     const mappedCategory = categoryMapping[currentPost.category || ''] || currentPost.category;
 
-    // First process and upload any pending files (blob URLs)
     let processedAttachments = [...(currentPost.attachments || [])];
     try {
       const uploadPromises = processedAttachments.map(async (item, idx) => {
@@ -234,18 +228,12 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
           if (result.error) {
             if (result.isBase64Fallback) {
               alert(`첨부파일 [${file.name}] 업로드 보안/연동 제한:\n${result.error}\n\n* 안정적인 저장을 위해 이미지를 로컬 Base64 데이터 형식으로 인코딩하여 게시물에 첨부하였습니다.`);
-              return {
-                ...item,
-                url: result.url
-              };
+              return { ...item, url: result.url };
             } else {
               throw new Error(result.error);
             }
           }
-          return {
-            ...item,
-            url: result.url
-          };
+          return { ...item, url: result.url };
         }
         return item;
       });
@@ -257,19 +245,16 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
       return;
     }
 
-    // Process and sort attachments
     const finalAttachments = processedAttachments
       .filter(a => a.url || a.name)
       .map((item, idx) => ({ ...item, sortOrder: item.sortOrder || (idx + 1) }))
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
-    // Default thumbnail logic
     let finalThumbnail = currentPost.thumbnail || '';
     if (!finalThumbnail && finalAttachments.length > 0) {
       finalThumbnail = finalAttachments[0].url;
     }
 
-    // If thumbnail was a blob URL, we should update it to the uploaded URL if possible
     if (finalThumbnail.startsWith('blob:')) {
       const matchingAttachment = finalAttachments.find((a, idx) => {
         const file = pendingFiles[idx];
@@ -292,18 +277,16 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
       boardType: collectionName
     };
 
-    // Agency type default mapping for projects
     if (collectionName === 'projects') {
       const typeVal = currentPost.agencyType || currentPost.agency_type || '발주처';
       data.agencyType = typeVal;
       data.agency_type = typeVal;
     }
 
-    // Subtitle backward compatibility mapping
     if (collectionName === 'news') {
       const newsSubtitle = currentPost.affiliation || currentPost.subtitle || '';
       data.subtitle = newsSubtitle;
-      data.affiliation = newsSubtitle; // both properties synchronized
+      data.affiliation = newsSubtitle;
     }
 
     try {
@@ -355,31 +338,24 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
       return ['박사 학위논문', '석사 학위논문'];
     }
     if (collectionName === 'projects') return ['연구 프로젝트', '실무 프로젝트'];
-    // For news, dynamically map from database configuration
     return newsConfig?.categories || ['Lab News', 'Announcement'];
   };
 
- const checkFileSize = (file: File, inputElement?: HTMLInputElement | null): boolean => {
+  const checkFileSize = (file: File, inputElement?: HTMLInputElement | null): boolean => {
     const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-    const MAX_SIZE = 2 * 1024 * 1024; // 2MB 제한 설정
-
+    const MAX_SIZE = 2 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      alert(`사진 용량이 너무 큽니다! (현재: ${sizeInMB}MB)\n최대 2MB 이하의 이미지만 업로드 가능합니다. 이미지 크기를 줄이거나 압축 후 다시 시도해 주세요.`);
-      if (inputElement) {
-        inputElement.value = ''; // 첨부 강제 취소
-      }
+      alert(`사진 용량이 너무 큽니다! (현재: ${sizeInMB}MB)\n최대 2MB 이하의 이미지만 업로드 가능합니다.`);
+      if (inputElement) inputElement.value = '';
       return false;
     }
-    return true; // 2MB 이하면 통과!
+    return true;
   };
   
   const handleFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!checkFileSize(file, e.target)) {
-      return;
-    }
+    if (!checkFileSize(file, e.target)) return;
 
     const currentAttachments = [...(currentPost?.attachments || [])];
     const fakeUrl = URL.createObjectURL(file);
@@ -410,7 +386,6 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
       }
     }
 
-    // Shift indexes in pendingFiles
     const newPending: { [key: number]: File } = {};
     Object.keys(pendingFiles).forEach(k => {
       const ki = parseInt(k);
@@ -424,7 +399,6 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
     setCurrentPost({ ...currentPost, attachments: currentAttachments });
   };
 
-  // Helper formatting for Textarea inserting markdown tags
   const insertMarkdown = (syntax: string) => {
     const textarea = document.getElementById('content-textarea') as HTMLTextAreaElement | null;
     if (!textarea) return;
@@ -480,12 +454,13 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
         </button>
       </div>
 
+      {/* ⭐️ 띄어쓰기 무시 스마트 검색창 추가 */}
       <div className="relative z-[40]">
         <div className="flex items-center border border-gray-200 focus-within:border-black transition-colors bg-white">
           <span className="pl-4 text-gray-400">🔍</span>
           <input 
             type="text"
-            placeholder="게시물 제목을 검색하세요 (띄어쓰기 무관)"
+            placeholder="게시물 제목 검색 (띄어쓰기 무관)"
             className="w-full p-4 outline-none text-sm font-sans"
             value={searchTerm}
             onChange={e => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
@@ -501,10 +476,9 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
               className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-1 max-h-80 overflow-y-auto"
             >
               {(() => {
-                // ⭐️ 띄어쓰기 무시 로직
                 const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
-                const query = normalize(searchTerm);
-                const matches = posts.filter(post => normalize(post.title).includes(query) || normalize(post.titleEn as string).includes(query));
+                const queryStr = normalize(searchTerm);
+                const matches = posts.filter(post => normalize(post.title).includes(queryStr) || normalize(post.titleEn as string).includes(queryStr));
                 
                 if (matches.length === 0) return <div className="p-4 text-xs text-gray-400 text-center tracking-widest">검색 결과가 없습니다.</div>;
                 
@@ -512,7 +486,6 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                   <div 
                     key={post.id}
                     onClick={() => {
-                      // 클릭 시 수정 창 열기 로직
                       const categoryMapping: { [key: string]: string } = {
                         'phd': '박사 학위논문', 'master': '석사 학위논문',
                         'intl': '국외 학술논문', 'domestic': '국내 학술논문',
@@ -537,7 +510,7 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                       });
                       setIsEditing(true);
                       setPendingFiles({});
-                      setSearchTerm(''); // 창이 열리면 검색창 비우기
+                      setSearchTerm('');
                     }}
                     className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer flex justify-between items-center group"
                   >
@@ -556,7 +529,6 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
 
       {collectionName === 'news' && (
         <div className="space-y-6">
-          {/* 1. News Page Description Banner Config */}
           <div className="bg-gray-50 border border-gray-100 p-8 space-y-6">
             <div className="space-y-1">
               <h4 className="text-sm font-bold tracking-tight">소식 페이지 소개글 설정</h4>
@@ -581,14 +553,12 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
             </div>
           </div>
 
-          {/* 2. Dynamic Categories Controller */}
           <div className="bg-gray-50 border border-gray-100 p-8 space-y-6">
             <div className="space-y-1">
               <h4 className="text-sm font-bold tracking-tight">소식 카테고리(Categories) 관리</h4>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">News Category Manager (전체(All) 카테고리는 고정 상태입니다)</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">News Category Manager</p>
             </div>
             <div className="space-y-4">
-              {/* Active display of loaded categories */}
               <div className="flex flex-wrap gap-2">
                 <div className="px-3 py-1.5 bg-gray-200/60 text-gray-400 font-bold text-[10px] uppercase tracking-widest border border-gray-200 select-none">
                   전체 (All)
@@ -610,53 +580,28 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
 
                     <div className="flex items-center gap-1 select-none">
                       {editingIndex === index ? (
-                        <button 
-                          onClick={() => handleSaveEditCat(index)} 
-                          className="text-[9px] font-bold text-green-600 hover:underline px-1 py-0.5 cursor-pointer"
-                        >
-                          저장
-                        </button>
+                        <button onClick={() => handleSaveEditCat(index)} className="text-[9px] font-bold text-green-600 hover:underline px-1 py-0.5 cursor-pointer">저장</button>
                       ) : (
-                        <button 
-                          onClick={() => { setEditingIndex(index); setEditingText(cat); }} 
-                          className="text-[9px] font-bold text-gray-400 hover:text-black hover:underline px-1 py-0.5 cursor-pointer"
-                        >
-                          수정
-                        </button>
+                        <button onClick={() => { setEditingIndex(index); setEditingText(cat); }} className="text-[9px] font-bold text-gray-400 hover:text-black hover:underline px-1 py-0.5 cursor-pointer">수정</button>
                       )}
-                      
-                      {cat.trim().toLowerCase() !== '전체' && 
-                       cat.trim().toLowerCase() !== '전체 (all)' && 
-                       cat.trim().toLowerCase() !== 'all' && (
-                        <button 
-                          onClick={() => handleDeleteCat(cat)} 
-                          className="text-[9px] font-bold text-red-500 hover:scale-110 active:scale-95 px-1 py-0.5 cursor-pointer transition-transform"
-                          title="Delete"
-                        >
-                          ×
-                        </button>
+                      {cat.trim().toLowerCase() !== '전체' && cat.trim().toLowerCase() !== '전체 (all)' && cat.trim().toLowerCase() !== 'all' && (
+                        <button onClick={() => handleDeleteCat(cat)} className="text-[9px] font-bold text-red-500 hover:scale-110 active:scale-95 px-1 py-0.5 cursor-pointer transition-transform" title="Delete">×</button>
                       )}
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Add category text element */}
               <div className="flex gap-2 max-w-sm pt-2">
                 <input 
                   type="text"
-                  placeholder="새 카테고리명 입력 (예: SEMINAR)"
+                  placeholder="새 카테고리명 입력"
                   className="flex-grow p-2 border border-gray-200 focus:border-black outline-none text-xs bg-white uppercase font-bold tracking-widest text-gray-700"
                   value={newCatText}
                   onChange={e => setNewCatText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleAddCat(); }}
                 />
-                <button
-                  onClick={handleAddCat}
-                  className="px-4 py-2 bg-black text-white text-[9px] font-bold tracking-widest uppercase hover:bg-gray-800 font-sans cursor-pointer"
-                >
-                  추가
-                </button>
+                <button onClick={handleAddCat} className="px-4 py-2 bg-black text-white text-[9px] font-bold tracking-widest uppercase hover:bg-gray-800 font-sans cursor-pointer">추가</button>
               </div>
             </div>
           </div>
@@ -739,45 +684,36 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                    {collectionName === 'projects' ? '한글 제목 (Korean Title)' : collectionName === 'news' ? '대제목 (Main Title)' : '국문 연구제목 (필수)'}
-                  </label>
+                  <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">제목</label>
                   <input 
                     type="text" 
                     className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
                     value={currentPost?.title || ''}
                     onChange={e => setCurrentPost({...currentPost, title: e.target.value})}
-                    placeholder={collectionName === 'news' ? "예: 2026학년도 신공간 창출 도시건축 설계 제안 공모안" : "예: 도시 건축의 지속가능성 연구"}
                     required
                   />
                 </div>
 
                 {(collectionName === 'projects' || collectionName === 'research') && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                      {collectionName === 'projects' ? '영문 제목 (English Title)' : '영문 연구제목 (선택)'}
-                    </label>
+                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">영문 제목</label>
                     <input 
                       type="text" 
                       className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
                       value={currentPost?.titleEn || ''}
                       onChange={e => setCurrentPost({...currentPost, titleEn: e.target.value})}
-                      placeholder={collectionName === 'projects' ? "Example: Sustainable Urban Architecture" : "Example: Sustainable Urban Architecture Study"}
                     />
                   </div>
                 )}
 
                 {collectionName === 'research' && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                      외부 링크 (URL)
-                    </label>
+                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">외부 링크 (URL)</label>
                     <input 
                       type="url" 
                       className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
                       value={currentPost?.url || ''}
                       onChange={e => setCurrentPost({...currentPost, url: e.target.value})}
-                      placeholder="https://example.com/paper"
                     />
                   </div>
                 )}
@@ -795,163 +731,29 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                     </div>
                   )}
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                      {collectionName === 'projects' ? '연구 기간' : collectionName === 'news' ? '게시일 (Date)' : '게재년도 (Year)'}
-                    </label>
-                    {collectionName === 'news' ? (
-                      <input 
-                        type="date" 
-                        className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
-                        value={currentPost?.year || new Date().toISOString().split('T')[0]}
-                        onChange={e => setCurrentPost({...currentPost, year: e.target.value})}
-                        required
-                      />
-                    ) : (
-                      <input 
-                        type="text" 
-                        className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
-                        value={currentPost?.year || ''}
-                        onChange={e => setCurrentPost({...currentPost, year: e.target.value})}
-                        placeholder={collectionName === 'projects' ? "예: 2021년 07월 ~ 2021년 11월" : "예: 2021"}
-                        required
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {collectionName === 'projects' ? (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400 block">
-                      기관 구분 및 기관명
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <select 
-                        className="p-4 border border-gray-100 focus:border-black outline-none text-sm bg-white font-medium sm:w-52 cursor-pointer"
-                        value={currentPost?.agencyType || currentPost?.agency_type || '발주처'}
-                        onChange={e => setCurrentPost({
-                          ...currentPost, 
-                          agencyType: e.target.value,
-                          agency_type: e.target.value
-                        })}
-                      >
-                        <option value="발주처">발주처</option>
-                        <option value="연구 지원 기관">연구 지원 기관</option>
-                      </select>
-                      <input 
-                        type="text" 
-                        className="flex-1 p-4 border border-gray-100 focus:border-black outline-none text-sm"
-                        value={currentPost?.affiliation || currentPost?.agency || ''}
-                        onChange={e => setCurrentPost({
-                          ...currentPost, 
-                          agencyType: currentPost?.agencyType || currentPost?.agency_type || '발주처',
-                          agency_type: currentPost?.agencyType || currentPost?.agency_type || '발주처',
-                          affiliation: e.target.value, 
-                          agency: e.target.value 
-                        })}
-                        placeholder={
-                          (currentPost?.agencyType || currentPost?.agency_type) === '연구 지원 기관'
-                            ? "예: 한국연구재단, 국토교통부"
-                            : "예: LH 토지주택연구원, 서울특별시"
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                     {collectionName === 'news' ? '소제목/요약글 (Subtitle)' : '소속기관 (Affiliation)'}
-                    </label>
+                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">년도/기간</label>
                     <input 
                       type="text" 
                       className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
-                      value={currentPost?.affiliation || currentPost?.subtitle || ''}
-                      onChange={e => setCurrentPost({...currentPost, affiliation: e.target.value, subtitle: e.target.value})}
-                      placeholder={collectionName === 'news' ? "예: 도시건축연구실과 새로운 미션을 수행할 신입 연구원을 모집합니다." : "예: 경북대학교 대학원"}
+                      value={currentPost?.year || ''}
+                      onChange={e => setCurrentPost({...currentPost, year: e.target.value})}
+                      required
                     />
                   </div>
-                )}
+                </div>
 
-                {collectionName === 'projects' && (
-                  <>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                        총괄 책임자
-                      </label>
-                      <input 
-                        type="text" 
-                        className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
-                        value={currentPost?.principalInvestigator || ''}
-                        onChange={e => setCurrentPost({...currentPost, principalInvestigator: e.target.value})}
-                        placeholder="예: 홍길동 교수"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                        부책임자
-                      </label>
-                      <input 
-                        type="text" 
-                        className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
-                        value={currentPost?.coInvestigator || ''}
-                        onChange={e => setCurrentPost({...currentPost, coInvestigator: e.target.value})}
-                        placeholder="예: 김철수 연구원"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                        참여 연구진
-                      </label>
-                      <textarea 
-                        className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm h-28 font-sans leading-relaxed"
-                        value={currentPost?.researchers || ''}
-                        onChange={e => setCurrentPost({...currentPost, researchers: e.target.value})}
-                        placeholder="예: 이영희, 박민수, 정수진 (쉼표나 줄바꿈으로 입력 가능)"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                        대상지 (Site)
-                      </label>
-                      <input 
-                        type="text" 
-                        className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
-                        value={currentPost?.location || currentPost?.site || ''}
-                        onChange={e => setCurrentPost({...currentPost, location: e.target.value, site: e.target.value})}
-                        placeholder="예: 서울특별시 종로구 OO동"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                        면적 (Area)
-                      </label>
-                      <div className="flex items-center border border-gray-100 focus-within:border-black bg-white transition-colors">
-                        <input 
-                          type="text" 
-                          className="flex-1 p-4 outline-none text-sm bg-transparent"
-                          value={currentPost?.area ?? ''}
-                          onChange={e => setCurrentPost({...currentPost, area: e.target.value})}
-                          placeholder="예: 1500"
-                        />
-                        <div className="px-4 py-4 bg-gray-50 text-gray-500 font-bold text-sm border-l border-gray-100 select-none">
-                          ㎡
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">소속기관 / 소제목</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm"
+                    value={currentPost?.affiliation || currentPost?.subtitle || ''}
+                    onChange={e => setCurrentPost({...currentPost, affiliation: e.target.value, subtitle: e.target.value})}
+                  />
+                </div>
 
                 <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400 block">썸네일 및 첨부 이미지 (Thumbnail & Attachments)</label>
-                    <p className="text-[9px] text-gray-400 font-medium">※ 리스트 좌측에 노출될 대표 이미지를 첨부 및 지정하세요 (권장 비율: 16:10).</p>
-                    <p className="text-[9px] text-[#A3A3A3] font-medium leading-normal pt-1">
-                      * 최대 2MB 이하의 이미지 파일(PNG, JPG)만 첨부 가능합니다. (Max file size: 2MB)
-                    </p>
-                  </div>
+                  <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400 block">이미지 첨부</label>
                   <div className="space-y-3">
                     {currentPost?.attachments?.map((file, idx) => (
                       <div key={idx} className="space-y-2">
@@ -963,58 +765,14 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                                   <div className="w-12 h-12 bg-gray-200 overflow-hidden flex-shrink-0 border border-gray-300">
                                     <img src={file.url} className="w-full h-full object-cover" alt="Preview" />
                                   </div>
-                                  <div className="flex flex-col gap-1 flex-1 overflow-hidden">
-                                    <span className="text-xs font-medium text-gray-600 truncate">{file.name}</span>
-                                    <div className="flex items-center gap-6">
-                                      {(collectionName === 'projects' || collectionName === 'news') && (
-                                        <label className="flex items-center gap-2 cursor-pointer group/thumb">
-                                          <input 
-                                            type="radio" 
-                                            name="thumbnail-selection"
-                                            checked={currentPost?.thumbnail === file.url}
-                                            onChange={() => setCurrentPost({...currentPost, thumbnail: file.url})}
-                                            className="w-3 h-3 accent-black"
-                                          />
-                                          <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400 group-hover/thumb:text-black transition-colors">대표 이미지 지정</span>
-                                        </label>
-                                      )}
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">순서</span>
-                                        <input 
-                                          type="number"
-                                          min="1"
-                                          className="w-12 p-1 border border-gray-200 text-xs focus:border-black outline-none bg-white"
-                                          value={file.sortOrder || ''}
-                                          onChange={(e) => {
-                                            const newOrder = parseInt(e.target.value) || 0;
-                                            const updated = [...(currentPost?.attachments || [])];
-                                            updated[idx] = { ...updated[idx], sortOrder: newOrder };
-                                            setCurrentPost({ ...currentPost, attachments: updated });
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
+                                  <span className="text-xs font-medium text-gray-600 truncate">{file.name}</span>
                                 </div>
-                                <button 
-                                  type="button" 
-                                  onClick={() => handleRemoveAttachment(idx)}
-                                  className="text-red-500 text-[9px] font-bold uppercase tracking-widest hover:underline px-2 cursor-pointer"
-                                >
-                                  Remove
-                                </button>
+                                <button type="button" onClick={() => handleRemoveAttachment(idx)} className="text-red-500 text-[9px] font-bold uppercase tracking-widest hover:underline px-2 cursor-pointer">Remove</button>
                               </div>
                             ) : (
                               <div className="relative">
-                                <input 
-                                  type="file" 
-                                  accept="image/*"
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                  onChange={(e) => handleFileChange(idx, e)}
-                                />
-                                <div className="p-3 border border-dashed border-gray-300 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400 group-hover:border-black group-hover:text-black transition-all cursor-pointer">
-                                  이미지 추가 +
-                                </div>
+                                <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => handleFileChange(idx, e)} />
+                                <div className="p-3 border border-dashed border-gray-300 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400 cursor-pointer">이미지 추가 +</div>
                               </div>
                             )}
                           </div>
@@ -1025,153 +783,26 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">
-                    {collectionName === 'news' ? '본문 내용 (Content)' : '연구 내용 (Description)'}
-                  </label>
-
-                  {/* WYSIWYG helper styling for News */}
-                  {collectionName === 'news' && (
-                    <div className="flex gap-1.5 pb-2 border-b border-gray-100 mb-2">
-                      <button 
-                        type="button"
-                        onClick={() => insertMarkdown('bold')}
-                        className="p-1 px-2.5 text-[10px] font-bold bg-gray-50 border border-gray-100 hover:bg-black hover:text-white transition-all rounded shadow-xs cursor-pointer"
-                        title="굵게 / Bold"
-                      >
-                        B
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => insertMarkdown('italic')}
-                        className="p-1 px-2.5 text-[10px] italic bg-gray-50 border border-gray-100 hover:bg-black hover:text-white transition-all rounded shadow-xs cursor-pointer"
-                        title="기울임 / Italic"
-                      >
-                        I
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => insertMarkdown('header')}
-                        className="p-1 px-2.5 text-[10px] font-bold bg-gray-50 border border-gray-100 hover:bg-black hover:text-white transition-all rounded shadow-xs cursor-pointer"
-                        title="대제목 / Heading"
-                      >
-                        H
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => insertMarkdown('quote')}
-                        className="p-1 px-2.5 text-[10px] font-mono bg-gray-50 border border-gray-100 hover:bg-black hover:text-white transition-all rounded shadow-xs cursor-pointer"
-                        title="인용구 / Quote"
-                      >
-                        ”
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => insertMarkdown('list')}
-                        className="p-1 px-2.5 text-[10px] bg-gray-50 border border-gray-100 hover:bg-black hover:text-white transition-all rounded shadow-xs cursor-pointer"
-                        title="목록 / Bullet List"
-                      >
-                        • List
-                      </button>
-                      <span className="text-[9px] text-gray-400 self-center ml-auto font-medium font-sans">
-                        Markdown Toolbar
-                      </span>
-                    </div>
-                  )}
-
+                  <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">본문 내용</label>
                   <textarea 
                     id="content-textarea"
                     className="w-full p-4 border border-gray-100 focus:border-black outline-none text-sm h-64 font-sans leading-relaxed"
                     value={currentPost?.content || ''}
                     onChange={e => setCurrentPost({...currentPost, content: e.target.value})}
-                    placeholder={collectionName === 'news' ? "상세 소식 내용을 다양한 양식(Markdown)으로 정성껏 입력하세요." : "연구 목적, 방법, 상세 내용을 기재하세요."}
                   />
                 </div>
 
-                <button 
-                  type="submit" 
-                  disabled={saving}
-                  className="w-full py-4 bg-black text-white text-[10px] font-bold tracking-widest uppercase hover:bg-gray-800 transition-colors disabled:bg-gray-400 cursor-pointer"
-                >
+                <button type="submit" disabled={saving} className="w-full py-4 bg-black text-white text-[10px] font-bold tracking-widest uppercase hover:bg-gray-800 transition-colors disabled:bg-gray-400 cursor-pointer">
                   {saving ? '저장 중...' : (currentPost?.id ? '수정 완료' : '등록 완료')}
                 </button>
               </form>
 
-              {/* Preview Area */}
               <div className="space-y-8 lg:sticky lg:top-0">
                 <div className="space-y-2">
                   <h3 className="text-[10px] font-bold tracking-widest uppercase text-gray-400">Live Preview</h3>
                   <div className="border border-gray-100 p-8 bg-white shadow-xs">
-                    {collectionName === 'projects' ? (
-                       <div className="space-y-6">
-                         <div className="aspect-[4/3] bg-gray-50 overflow-hidden relative">
-                           {currentPost?.thumbnail ? (
-                             <img src={currentPost.thumbnail} className="w-full h-full object-cover grayscale" alt="" />
-                           ) : (
-                             <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300 uppercase tracking-widest">Preview</div>
-                           )}
-                         </div>
-                         <div className="space-y-2">
-                           <h4 className="text-xl font-bold tracking-tight">{currentPost?.title || '한글 제목'}</h4>
-                           <p className="text-sm text-gray-400">{currentPost?.titleEn || 'English Title'}</p>
-                           <div className="pt-4 border-t border-gray-100 space-y-2">
-                             {(currentPost?.affiliation || currentPost?.agency) ? (
-                               <div className="flex justify-between text-[10px]">
-                                 <span className="font-bold text-gray-300">{currentPost?.agencyType || currentPost?.agency_type || '발주처'}</span>
-                                 <span>{currentPost?.affiliation || currentPost?.agency}</span>
-                               </div>
-                             ) : null}
-                             {currentPost?.principalInvestigator && (
-                               <div className="flex justify-between text-[10px]">
-                                 <span className="font-bold text-gray-300">총괄 책임자</span>
-                                 <span>{currentPost.principalInvestigator}</span>
-                               </div>
-                             )}
-                             {currentPost?.coInvestigator && (
-                               <div className="flex justify-between text-[10px]">
-                                 <span className="font-bold text-gray-300">부책임자</span>
-                                 <span>{currentPost.coInvestigator}</span>
-                               </div>
-                             )}
-                             {currentPost?.researchers && (
-                               <div className="flex justify-between text-[10px]">
-                                 <span className="font-bold text-gray-300">참여 연구진</span>
-                                 <span className="truncate max-w-[150px]">{currentPost.researchers}</span>
-                               </div>
-                             )}
-                             {(currentPost?.location || currentPost?.site) && (
-                               <div className="flex justify-between text-[10px]">
-                                 <span className="font-bold text-gray-300">대상지</span>
-                                 <span className="truncate max-w-[150px]">{currentPost.location || currentPost.site}</span>
-                               </div>
-                             )}
-                             {currentPost?.area && (
-                               <div className="flex justify-between text-[10px]">
-                                 <span className="font-bold text-gray-300">면적</span>
-                                 <span>{formatArea(currentPost.area)}</span>
-                               </div>
-                             )}
-                             <div className="flex justify-between text-[10px]">
-                               <span className="font-bold text-gray-300">기간</span>
-                               <span>{currentPost?.year || '-'}</span>
-                             </div>
-                           </div>
-                         </div>
-                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="bg-black text-white px-4 py-2 text-[10px] font-bold tracking-widest uppercase">
-                          {currentPost?.category || 'Category'}
-                        </div>
-                        <div className="space-y-1.5">
-                          <h4 className="text-lg font-bold tracking-tight text-gray-950">{currentPost?.title || '국문 연구제목'}</h4>
-                          {currentPost?.titleEn && (
-                            <p className="text-xs text-gray-500 font-normal">{currentPost.titleEn}</p>
-                          )}
-                          {currentPost?.affiliation && <p className="text-xs text-gray-500 font-medium">{currentPost.affiliation}</p>}
-                          <p className="text-[9px] text-gray-400 tracking-wider font-mono">{currentPost?.year || 'Date'}</p>
-                        </div>
-                      </div>
-                    )}
+                    <h4 className="text-lg font-bold tracking-tight text-gray-950">{currentPost?.title || '국문 제목'}</h4>
+                    <p className="text-xs text-gray-500 font-normal">{currentPost?.titleEn || ''}</p>
                   </div>
                 </div>
               </div>
@@ -1180,7 +811,7 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
         </motion.div>
       )}
 
-      {/* ⭐️ 여기서부터 추가 */}
+      {/* ⭐️ 페이지네이션이 적용된 게시물 리스트 렌더링 */}
       {(() => {
         const totalPages = Math.ceil(posts.length / itemsPerPage);
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1188,94 +819,75 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
 
         return (
           <>
-      {/* ⭐️ 여기까지 추가 */}
-            
-      <div className="grid gap-4">
-        {loading ? (
-          <div className="text-center py-24 text-gray-300 text-[10px] font-bold uppercase tracking-widest">Loading Items...</div>
-        ) : posts.length === 0 ? (
-          <div className="text-center py-24 border border-dashed border-gray-200 text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Posts Found</div>
-        ) : (
-          currentPosts.map(post => (
-            <div key={post.id} className="flex items-center justify-between p-6 border border-gray-100 bg-white hover:border-black transition-all group">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 bg-gray-50 overflow-hidden flex-shrink-0 border border-gray-100">
-                  {post.thumbnail && <img src={post.thumbnail} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-opacity duration-500" alt="" />}
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[8px] font-bold uppercase tracking-tighter bg-gray-100 px-1 py-0.5">{post.category}</span>
-                    <h4 className="text-sm font-bold tracking-tight">{post.title}</h4>
+            <div className="grid gap-4">
+              {loading ? (
+                <div className="text-center py-24 text-gray-300 text-[10px] font-bold uppercase tracking-widest">Loading Items...</div>
+              ) : posts.length === 0 ? (
+                <div className="text-center py-24 border border-dashed border-gray-200 text-gray-300 text-[10px] font-bold uppercase tracking-widest">No Posts Found</div>
+              ) : (
+                currentPosts.map(post => (
+                  <div key={post.id} className="flex items-center justify-between p-6 border border-gray-100 bg-white hover:border-black transition-all group">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-gray-50 overflow-hidden flex-shrink-0 border border-gray-100">
+                        {post.thumbnail && <img src={post.thumbnail} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-opacity duration-500" alt="" />}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-bold uppercase tracking-tighter bg-gray-100 px-1 py-0.5">{post.category}</span>
+                          <h4 className="text-sm font-bold tracking-tight">{post.title}</h4>
+                        </div>
+                        {post.titleEn && <p className="text-xs text-gray-500 font-normal">{post.titleEn}</p>}
+                        <p className="text-[10px] text-gray-400 uppercase tracking-widest font-medium">[{post.year}] {post.affiliation}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => {
+                          const categoryMapping: { [key: string]: string } = {
+                            'phd': '박사 학위논문', 'master': '석사 학위논문',
+                            'intl': '국외 학술논문', 'domestic': '국내 학술논문',
+                            'general': '연구 프로젝트', 'practical': '실무 프로젝트'
+                          };
+                          const rawCategory = post.category || '';
+                          let resolvedCategory = categoryMapping[rawCategory] || rawCategory;
+                          const determinedResearchType = (
+                            rawCategory === 'intl' || rawCategory === 'domestic' || 
+                            rawCategory === '국외 학술논문' || rawCategory === '국내 학술논문' ||
+                            post.researchType === 'journal'
+                          ) ? 'journal' : 'thesis';
+                          if (!resolvedCategory || resolvedCategory === '') resolvedCategory = determinedResearchType === 'journal' ? '국외 학술논문' : '박사 학위논문';
+
+                          setCurrentPost({
+                            ...post,
+                            researchType: post.researchType || determinedResearchType,
+                            category: resolvedCategory,
+                            attachments: post.attachments && post.attachments.length > 0 
+                              ? [...post.attachments.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)), { name: '', url: '', type: 'image', sortOrder: post.attachments.length + 1 }] 
+                              : [{ name: '', url: '', type: 'image', sortOrder: 1 }]
+                          });
+                          setIsEditing(true);
+                          setPendingFiles({});
+                        }}
+                        className="text-[10px] font-bold uppercase tracking-[0.2em] hover:text-gray-400 cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button onClick={() => setDeleteId(post.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                      </button>
+                    </div>
                   </div>
-                  {post.titleEn && (
-                    <p className="text-xs text-gray-500 font-normal">{post.titleEn}</p>
-                  )}
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest font-medium">[{post.year}] {post.affiliation}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => {
-                    const categoryMapping: { [key: string]: string } = {
-                      'phd': '박사 학위논문',
-                      'master': '석사 학위논문',
-                      'intl': '국외 학술논문',
-                      'domestic': '국내 학술논문',
-                      'general': '연구 프로젝트',
-                      'practical': '실무 프로젝트'
-                    };
-                    
-                    const rawCategory = post.category || '';
-                    let resolvedCategory = categoryMapping[rawCategory] || rawCategory;
-                    
-                    // Determine researchType dynamically if missing from Firestore
-                    const determinedResearchType = (
-                      rawCategory === 'intl' || 
-                      rawCategory === 'domestic' || 
-                      rawCategory === '국외 학술논문' || 
-                      rawCategory === '국내 학술논문' ||
-                      post.researchType === 'journal'
-                    ) ? 'journal' : 'thesis';
-
-                    // Align category with researchType to avoid empty matches
-                    if (!resolvedCategory || resolvedCategory === '') {
-                      resolvedCategory = determinedResearchType === 'journal' ? '국외 학술논문' : '박사 학위논문';
-                    }
-
-                    setCurrentPost({
-                      ...post,
-                      researchType: post.researchType || determinedResearchType,
-                      category: resolvedCategory,
-                      attachments: post.attachments && post.attachments.length > 0 
-                        ? [...post.attachments.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)), { name: '', url: '', type: 'image', sortOrder: post.attachments.length + 1 }] 
-                        : [{ name: '', url: '', type: 'image', sortOrder: 1 }]
-                    });
-                    setIsEditing(true);
-                    setPendingFiles({});
-                  }}
-                  className="text-[10px] font-bold uppercase tracking-[0.2em] hover:text-gray-400 cursor-pointer"
-                >
-                  Edit
-                </button>
-                <button 
-                  onClick={() => setDeleteId(post.id)}
-                  className="p-2 text-gray-300 hover:text-red-500 transition-colors cursor-pointer"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                </button>
-              </div>
+                ))
+              )}
             </div>
-          ))
-        )}
-      </div>
 
-{/* ⭐️ 여기서부터 추가 (페이지네이션 UI) */}
+            {/* 하단 페이지네이션 버튼 */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 pt-8">
                 <button 
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all"
+                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
                 >
                   &lt;
                 </button>
@@ -1283,7 +895,7 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                   <button
                     key={i}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 flex items-center justify-center text-[10px] font-bold border transition-all ${
+                    className={`w-8 h-8 flex items-center justify-center text-[10px] font-bold border transition-all cursor-pointer ${
                       currentPage === i + 1 
                         ? 'border-black bg-black text-white' 
                         : 'border-transparent text-gray-400 hover:text-black hover:border-gray-200'
@@ -1295,7 +907,7 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
                 <button 
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all"
+                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
                 >
                   &gt;
                 </button>
@@ -1304,8 +916,7 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
           </>
         );
       })()}
-      {/* ⭐️ 여기까지 추가 끝 */}
-            
+
       {showSuccess && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[300] bg-black text-white px-8 py-4 text-[10px] font-bold tracking-widest uppercase shadow-2xl">
           {successMessage}
@@ -1331,7 +942,7 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
             <h3 className="text-xl font-bold tracking-tight">카테고리 삭제</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
               정말 삭제하시겠습니까?<br/>
-              해당 카테고리에 포함된 게시물은 '전체(ALL)'(또는 '미분류')로 자동 이동됩니다.
+              해당 카테고리에 포함된 게시물은 '전체(ALL)'로 자동 이동됩니다.
             </p>
             <div className="flex gap-4">
               <button onClick={() => setConfirmDeleteCat(null)} className="flex-1 py-3 border border-gray-100 text-[10px] font-bold uppercase tracking-widest cursor-pointer">취소</button>
