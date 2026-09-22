@@ -33,7 +33,7 @@ export default function Hero({ latestContent }: HeroProps) {
           transition={{ duration: 1.5 }}
           src={bannerUrl} 
           alt="Urban Landscape"
-          className="w-full h-full object-cover grayscale brightness-[0.4]"
+          className="w-full h-full object-cover grayscale brightness-[0.7]"
           referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/40"></div>
