@@ -23,9 +23,10 @@ export default function Research() {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ⭐️ 페이지네이션용 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6; // 리스트형 = 6개
+  const itemsPerPage = 12; // 리스트형 = 12개
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const activeTab = searchParams.get('category') || 'all'; 
 
@@ -174,6 +175,55 @@ export default function Research() {
           </h3>
           <h2 className="text-3xl font-bold tracking-tight uppercase">Research</h2>
         </div>
+      </div>
+
+      <div className="relative z-[40] w-full max-w-xl -mt-8">
+        <div className="flex items-center border-b-2 border-gray-200 focus-within:border-black transition-colors bg-transparent pb-3">
+          <span className="pr-3 text-gray-400">🔍</span>
+          <input 
+            type="text"
+            placeholder="연구 실적 검색 (띄어쓰기 무관)"
+            className="w-full bg-transparent outline-none text-sm font-sans"
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          />
+        </div>
+        
+        <AnimatePresence>
+          {showSuggestions && searchTerm && (
+            <motion.div 
+              initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+              className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-2 max-h-80 overflow-y-auto"
+            >
+              {(() => {
+                const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
+                const query = normalize(searchTerm);
+                const matches = items.filter(item => normalize(item.title).includes(query) || normalize(item.titleEn as string).includes(query));
+                
+                if (matches.length === 0) return <div className="p-4 text-xs text-gray-400 text-center tracking-widest">검색 결과가 없습니다.</div>;
+                
+                return matches.map(item => (
+                  <div 
+                    key={item.id}
+                    onClick={() => {
+                      handleItemClick(item.url); // ⭐️ 클릭 시 외부 링크로 이동
+                      setSearchTerm('');
+                    }}
+                    className={`p-4 border-b border-gray-50 hover:bg-gray-50 flex justify-between items-center group transition-colors ${item.url ? 'cursor-pointer' : 'cursor-default'}`}
+                  >
+                     <div>
+                       <p className={`text-sm font-bold text-gray-900 transition-colors ${item.url ? 'group-hover:text-blue-600' : ''}`}>{item.title}</p>
+                       <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{getCategoryLabel(item.category)} | {item.year}</p>
+                     </div>
+                     {item.url && <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Link ↗</span>}
+                  </div>
+                ));
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Modern Filter Tabs */}
