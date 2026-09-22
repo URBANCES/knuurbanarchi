@@ -47,10 +47,10 @@ export default function Research() {
   };
 
   useEffect(() => {
+    // orderBy를 제거하여 복합 색인 오류 및 첫 접속 로딩 실패 원천 차단
     const q = query(
       collection(db, 'research'),
-      where('isPublished', '==', true),
-      orderBy('year', 'desc')
+      where('isPublished', '==', true)
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -58,6 +58,13 @@ export default function Research() {
         id: doc.id,
         ...doc.data()
       })) as ResearchItem[];
+
+      // 클라이언트 측에서 연도 기준 내림차순 정렬 (최신순)
+      fetchedItems.sort((a, b) => {
+        const yearA = parseInt(a.year) || 0;
+        const yearB = parseInt(b.year) || 0;
+        return yearB - yearA;
+      });
 
       for (const item of fetchedItems) {
         if (!item.category || item.category === '' || item.category === '미분류' || item.category === 'unclassified') {
