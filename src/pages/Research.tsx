@@ -23,8 +23,11 @@ export default function Research() {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // 1페이지당 8개씩 노출
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12; // 리스트형 = 12개
+  const itemsPerPage = 8; 
+
+  // 검색용 상태 추가
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -44,7 +47,6 @@ export default function Research() {
   };
 
   useEffect(() => {
-    // Fetch all published research items
     const q = query(
       collection(db, 'research'),
       where('isPublished', '==', true),
@@ -57,15 +59,13 @@ export default function Research() {
         ...doc.data()
       })) as ResearchItem[];
 
-      // Real-time Database Recovery & Healing Routine for unclassified entries
       for (const item of fetchedItems) {
         if (!item.category || item.category === '' || item.category === '미분류' || item.category === 'unclassified') {
-          let correctedCategory = 'master'; // Default fallback
+          let correctedCategory = 'master'; 
           let correctedResearchType = 'thesis';
 
           const titleText = (item.title || '') + ' ' + (item.author || '') + ' ' + (item.affiliation || '');
 
-          // Check keywords for Thesis vs Publications
           if (
             titleText.includes('Dissertation') || 
             titleText.includes('Thesis') || 
@@ -87,16 +87,13 @@ export default function Research() {
             item.researchType === 'journal'
           ) {
             correctedResearchType = 'journal';
-            // Determine if domestic vs international (contains Han-gul)
             const containsKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(titleText);
             correctedCategory = containsKorean ? 'domestic' : 'intl';
           } else {
-            // General heuristics fallback
             correctedResearchType = 'thesis';
             correctedCategory = 'master';
           }
 
-          // Permanently correct back to Firestore dynamically
           try {
             await updateDoc(doc(db, 'research', item.id), {
               category: correctedCategory,
@@ -124,7 +121,6 @@ export default function Research() {
     }
   };
 
-  // Perform client-side filter for maximum instantaneous responsiveness
   const filteredItems = items.filter(item => {
     if (activeTab === 'all') return true;
     
@@ -165,6 +161,9 @@ export default function Research() {
     );
   }
 
+  // 전체 페이지 수 계산
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-24 space-y-16">
       {/* Breadcrumb & Dynamic Title */}
@@ -177,7 +176,8 @@ export default function Research() {
         </div>
       </div>
 
-      <div className="relative z-[40] w-full max-w-xl -mt-8">
+      {/* 스마트 검색창 (띄어쓰기 무관) */}
+      <div className="relative z-[40] w-full max-w-xl">
         <div className="flex items-center border-b-2 border-gray-200 focus-within:border-black transition-colors bg-transparent pb-3">
           <span className="pr-3 text-gray-400">🔍</span>
           <input 
@@ -195,12 +195,12 @@ export default function Research() {
           {showSuggestions && searchTerm && (
             <motion.div 
               initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-              className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-2 max-h-80 overflow-y-auto"
+              className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-2 max-h-80 overflow-y-auto z-50"
             >
               {(() => {
                 const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
-                const query = normalize(searchTerm);
-                const matches = items.filter(item => normalize(item.title).includes(query) || normalize(item.titleEn as string).includes(query));
+                const queryStr = normalize(searchTerm);
+                const matches = items.filter(item => normalize(item.title).includes(queryStr) || normalize(item.titleEn as string).includes(queryStr));
                 
                 if (matches.length === 0) return <div className="p-4 text-xs text-gray-400 text-center tracking-widest">검색 결과가 없습니다.</div>;
                 
@@ -208,7 +208,7 @@ export default function Research() {
                   <div 
                     key={item.id}
                     onClick={() => {
-                      handleItemClick(item.url); // ⭐️ 클릭 시 외부 링크로 이동
+                      handleItemClick(item.url); // 클릭 시 링크로 이동
                       setSearchTerm('');
                     }}
                     className={`p-4 border-b border-gray-50 hover:bg-gray-50 flex justify-between items-center group transition-colors ${item.url ? 'cursor-pointer' : 'cursor-default'}`}
@@ -253,12 +253,11 @@ export default function Research() {
       </div>
 
       {/* Combined List Section & Pagination */}
-      <div className="px-4 md:px-12">
+      <div className="px-4 md:px-12 space-y-12">
         <div className="divide-y divide-gray-100">
           <AnimatePresence mode="popLayout">
             {filteredItems.length > 0 ? (
-              // ⭐️ 페이지에 맞게 데이터 자르기 로직 적용
-              filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
+              filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item) => (
                 <motion.div
                   key={item.id}
                   layout
@@ -269,7 +268,7 @@ export default function Research() {
                   onClick={() => handleItemClick(item.url)}
                   className={`flex flex-col md:flex-row justify-between items-start md:items-center py-6 gap-6 group transition-all hover:bg-gray-50/50 ${item.url ? 'cursor-pointer' : ''}`}
                 >
-                  {/* Left Area: Title & Author (Indented) */}
+                  {/* Left Area: Title & Author */}
                   <div className="space-y-2.5 max-w-3xl">
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] font-bold tracking-wider text-black border border-black/15 bg-gray-50 px-2 py-0.5 uppercase">
@@ -291,7 +290,7 @@ export default function Research() {
                     )}
                   </div>
 
-                  {/* Right Area: Year & Institution (Compact) */}
+                  {/* Right Area: Year & Institution */}
                   <div className="text-right space-y-0.5 w-full md:w-auto">
                     <p className="text-[0.85rem] font-normal text-gray-500 whitespace-nowrap">
                       게재년도 | <span className="font-semibold text-black">{item.year}</span>
@@ -315,9 +314,9 @@ export default function Research() {
           </AnimatePresence>
         </div>
 
-        {/* ⭐️ 페이지네이션 UI 추가 */}
-        {filteredItems.length > itemsPerPage && (
-          <div className="flex justify-center items-center gap-3 pt-16">
+        {/* ⭐️ 페이지네이션 버튼 UI (총 페이지가 2페이지 이상일 때만 표시) */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-3 pt-8">
             <button 
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
@@ -325,7 +324,7 @@ export default function Research() {
             >
               &lt;
             </button>
-            {Array.from({ length: Math.ceil(filteredItems.length / itemsPerPage) }).map((_, i) => (
+            {Array.from({ length: totalPages }).map((_, i) => (
               <button
                 key={i}
                 onClick={() => setCurrentPage(i + 1)}
@@ -339,8 +338,8 @@ export default function Research() {
               </button>
             ))}
             <button 
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredItems.length / itemsPerPage)))}
-              disabled={currentPage === Math.ceil(filteredItems.length / itemsPerPage)}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
               className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
             >
               &gt;
