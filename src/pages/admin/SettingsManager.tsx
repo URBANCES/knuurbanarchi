@@ -157,22 +157,14 @@ export default function SettingsManager() {
             />
           </div>
         </div>
-        {/* ⭐️ 메인 배너 업로드 섹션 추가 */}
+        {/* ⭐️ 메인 배너 업로드 섹션 */}
         <div className="space-y-4 pt-8 border-t border-gray-100">
-          <div className="space-y-2">
+          <div className="space-y-4">
             <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">메인 배너 이미지 (Main Banner Image)</label>
-            <div className="flex gap-4 items-end">
-              <div className="flex-grow space-y-2">
-                <input 
-                  type="text" 
-                  className="w-full p-3 bg-white border border-gray-200 text-sm focus:outline-none focus:border-black"
-                  value={settings.mainBannerUrl}
-                  onChange={e => setSettings({...settings, mainBannerUrl: e.target.value})}
-                  placeholder="이미지를 첨부하거나 URL을 직접 입력하세요."
-                />
-              </div>
-              <label className="flex-shrink-0 px-6 py-3 bg-black text-white text-[10px] font-bold tracking-widest uppercase hover:bg-gray-800 transition-colors cursor-pointer text-center">
-                {uploading ? '업로드 중...' : '이미지 첨부'}
+            
+            <div className="flex gap-2">
+              <label className="px-6 py-3 bg-black text-white text-[10px] font-bold tracking-widest uppercase hover:bg-gray-800 transition-colors cursor-pointer text-center">
+                {uploading ? '업로드 중...' : (settings.mainBannerUrl ? '배너 변경하기' : '새 배너 첨부')}
                 <input 
                   id="banner-file-input"
                   type="file" 
@@ -182,7 +174,29 @@ export default function SettingsManager() {
                   disabled={uploading}
                 />
               </label>
+              
+              {/* ⭐️ 삭제 버튼 추가! */}
+              {settings.mainBannerUrl && (
+                <button 
+                  type="button"
+                  onClick={() => setSettings(prev => ({ ...prev, mainBannerUrl: '' }))}
+                  className="px-6 py-3 bg-red-600 text-white text-[10px] font-bold tracking-widest uppercase hover:bg-red-700 transition-colors"
+                >
+                  삭제
+                </button>
+              )}
             </div>
+
+            <div className="space-y-2">
+              <input 
+                type="url" 
+                className="w-full p-3 bg-white border border-gray-200 text-sm focus:outline-none focus:border-black"
+                value={settings.mainBannerUrl}
+                onChange={e => setSettings({...settings, mainBannerUrl: e.target.value})}
+                placeholder="이미지를 첨부하거나 URL을 직접 입력하세요."
+              />
+            </div>
+
             {settings.mainBannerUrl && (
               <div className="mt-4 aspect-[21/9] w-full border border-gray-100 overflow-hidden rounded bg-gray-50">
                 <img src={settings.mainBannerUrl} className="w-full h-full object-cover grayscale opacity-90" alt="Banner Preview" />
