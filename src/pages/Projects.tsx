@@ -23,9 +23,14 @@ export default function Projects() {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // ⭐️ 1. 페이지네이션용 상태 추가 (갤러리형 = 6개)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6; 
+
   const activeTab = searchParams.get('category') || 'all'; // 'all', 'general', 'practical'
 
   const setActiveTab = (tab: string) => {
+    setCurrentPage(1); // ⭐️ 2. 탭이 바뀌면 무조건 1페이지로 돌아가도록 초기화
     if (tab === 'all') {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('category');
@@ -160,7 +165,8 @@ export default function Projects() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
         <AnimatePresence mode="popLayout">
           {filteredProjects.length > 0 ? (
-            filteredProjects.map((project, idx) => (
+            // ⭐️ 3. 데이터 6개씩 자르기 로직 적용! (slice)
+            filteredProjects.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((project, idx) => (
               <ProjectCard
                 key={project.id}
                 project={project}
@@ -178,6 +184,39 @@ export default function Projects() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ⭐️ 4. 하단 페이지 번호 버튼 UI 추가 */}
+      {filteredProjects.length > itemsPerPage && (
+        <div className="flex justify-center items-center gap-3 pt-16">
+          <button 
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
+          >
+            &lt;
+          </button>
+          {Array.from({ length: Math.ceil(filteredProjects.length / itemsPerPage) }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentPage(i + 1)}
+              className={`w-8 h-8 flex items-center justify-center text-[10px] font-bold border transition-all cursor-pointer ${
+                currentPage === i + 1 
+                  ? 'border-black bg-black text-white' 
+                  : 'border-transparent text-gray-400 hover:text-black hover:border-gray-200'
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+          <button 
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredProjects.length / itemsPerPage)))}
+            disabled={currentPage === Math.ceil(filteredProjects.length / itemsPerPage)}
+            className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
+          >
+            &gt;
+          </button>
+        </div>
+      )}
     </div>
   );
 }
