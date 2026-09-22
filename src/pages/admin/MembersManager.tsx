@@ -140,27 +140,39 @@ export default function MembersManager() {
   const handleUploadDefaultImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setSavingDefaultImg(true);
-    const storagePath = `settings/default_member_image_${Date.now()}`;
-    const result = await uploadImageWithFallback(file, storagePath, setUploading);
-    
-    if (result.error && !result.isBase64Fallback) {
-      alert(`기본 이미지 업로드 실패: ${result.error}`);
-      setSavingDefaultImg(false);
+
+    // ⭐️ 파이어스토어 문서 용량 제한(1MB) 초과 방지를 위한 1MB 이하 제한
+    if (file.size > 1 * 1024 * 1024) {
+      alert('기본 프로필 이미지는 1MB 이하의 파일만 업로드 가능합니다. 이미지 크기를 줄이거나 압축 후 다시 시도해 주세요.');
+      e.target.value = '';
       return;
     }
 
+    setSavingDefaultImg(true);
+    const storagePath = `settings/default_member_image_${Date.now()}`;
+    
     try {
+      const result = await uploadImageWithFallback(file, storagePath, setUploading);
+      
+      if (result.error && !result.isBase64Fallback) {
+        alert(`기본 이미지 업로드 실패: ${result.error}`);
+        setSavingDefaultImg(false);
+        return;
+      }
+
+      // ⭐️ membersConfig가 비어있어도 안전하게 객체 생성
       await setDoc(doc(db, 'boardConfigs', 'members'), {
-        ...membersConfig,
+        ...(membersConfig || {}),
         defaultProfileImage: result.url
       }, { merge: true });
+
       alert('기본 프로필 이미지가 성공적으로 저장되었습니다.');
-    } catch (err) {
-      console.error(err);
-      alert('저장 중 오류가 발생했습니다.');
+    } catch (err: any) {
+      console.error('Default image save error:', err);
+      alert('저장 중 오류가 발생했습니다:\n' + (err?.message || '알 수 없는 오류'));
     } finally {
       setSavingDefaultImg(false);
+      e.target.value = '';
     }
   };
 
