@@ -23,13 +23,14 @@ export default function Research() {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // ⭐️ 페이지네이션용 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8; // 리스트형 = 8개
 
   const activeTab = searchParams.get('category') || 'all'; 
 
   const setActiveTab = (tab: string) => {
-    setCurrentPage(1); //
+    setCurrentPage(1); // 탭이 바뀌면 1페이지로 초기화
     if (tab === 'all') {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('category');
@@ -100,7 +101,6 @@ export default function Research() {
               category: correctedCategory,
               researchType: correctedResearchType
             });
-            console.log(`Successfully healed research item [${item.title}] with category: ${correctedCategory}`);
           } catch (err) {
             console.error('Failed to auto-heal research document:', err);
           }
@@ -202,13 +202,12 @@ export default function Research() {
         ))}
       </div>
 
-      {/* Combined List Section */}
       {/* Combined List Section & Pagination */}
       <div className="px-4 md:px-12">
         <div className="divide-y divide-gray-100">
           <AnimatePresence mode="popLayout">
             {filteredItems.length > 0 ? (
-              // ⭐️ 자르기 로직 적용!
+              // ⭐️ 페이지에 맞게 데이터 자르기 로직 적용
               filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
                 <motion.div
                   key={item.id}
@@ -220,7 +219,6 @@ export default function Research() {
                   onClick={() => handleItemClick(item.url)}
                   className={`flex flex-col md:flex-row justify-between items-start md:items-center py-6 gap-6 group transition-all hover:bg-gray-50/50 ${item.url ? 'cursor-pointer' : ''}`}
                 >
-                  {/* ... (기존 아이템 렌더링 코드 유지 - title, author 등) ... */}
                   {/* Left Area: Title & Author (Indented) */}
                   <div className="space-y-2.5 max-w-3xl">
                     <div className="flex items-center gap-2">
@@ -300,3 +298,6 @@ export default function Research() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
