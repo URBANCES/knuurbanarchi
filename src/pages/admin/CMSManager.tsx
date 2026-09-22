@@ -58,6 +58,9 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
   const [pendingFiles, setPendingFiles] = useState<{ [index: number]: File }>({});
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8; // 1페이지당 보여줄 개수 (리스트형 = 8개)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // News configuration states (intro description and categories)
   const [newsConfig, setNewsConfig] = useState<any>(null);
@@ -475,6 +478,80 @@ export default function CMSManager({ collectionName, title }: { collectionName: 
         >
           새 게시물 추가
         </button>
+      </div>
+
+      <div className="relative z-[40]">
+        <div className="flex items-center border border-gray-200 focus-within:border-black transition-colors bg-white">
+          <span className="pl-4 text-gray-400">🔍</span>
+          <input 
+            type="text"
+            placeholder="게시물 제목을 검색하세요 (띄어쓰기 무관)"
+            className="w-full p-4 outline-none text-sm font-sans"
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          />
+        </div>
+        
+        <AnimatePresence>
+          {showSuggestions && searchTerm && (
+            <motion.div 
+              initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+              className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-1 max-h-80 overflow-y-auto"
+            >
+              {(() => {
+                // ⭐️ 띄어쓰기 무시 로직
+                const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
+                const query = normalize(searchTerm);
+                const matches = posts.filter(post => normalize(post.title).includes(query) || normalize(post.titleEn as string).includes(query));
+                
+                if (matches.length === 0) return <div className="p-4 text-xs text-gray-400 text-center tracking-widest">검색 결과가 없습니다.</div>;
+                
+                return matches.map(post => (
+                  <div 
+                    key={post.id}
+                    onClick={() => {
+                      // 클릭 시 수정 창 열기 로직
+                      const categoryMapping: { [key: string]: string } = {
+                        'phd': '박사 학위논문', 'master': '석사 학위논문',
+                        'intl': '국외 학술논문', 'domestic': '국내 학술논문',
+                        'general': '연구 프로젝트', 'practical': '실무 프로젝트'
+                      };
+                      const rawCategory = post.category || '';
+                      let resolvedCategory = categoryMapping[rawCategory] || rawCategory;
+                      const determinedResearchType = (
+                        rawCategory === 'intl' || rawCategory === 'domestic' || 
+                        rawCategory === '국외 학술논문' || rawCategory === '국내 학술논문' ||
+                        post.researchType === 'journal'
+                      ) ? 'journal' : 'thesis';
+                      if (!resolvedCategory || resolvedCategory === '') resolvedCategory = determinedResearchType === 'journal' ? '국외 학술논문' : '박사 학위논문';
+
+                      setCurrentPost({
+                        ...post,
+                        researchType: post.researchType || determinedResearchType,
+                        category: resolvedCategory,
+                        attachments: post.attachments && post.attachments.length > 0 
+                          ? [...post.attachments.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)), { name: '', url: '', type: 'image', sortOrder: post.attachments.length + 1 }] 
+                          : [{ name: '', url: '', type: 'image', sortOrder: 1 }]
+                      });
+                      setIsEditing(true);
+                      setPendingFiles({});
+                      setSearchTerm(''); // 창이 열리면 검색창 비우기
+                    }}
+                    className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer flex justify-between items-center group"
+                  >
+                     <div>
+                       <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{post.title}</p>
+                       <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{post.category} | {post.year}</p>
+                     </div>
+                     <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">수정하기 📝</span>
+                  </div>
+                ));
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {collectionName === 'news' && (
