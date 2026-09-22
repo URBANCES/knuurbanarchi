@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadImageWithFallback } from '../../lib/uploadHelper';
 import { db, storage } from '../../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -111,17 +111,58 @@ export default function MembersManager() {
   const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // 검색 및 페이지네이션 상태 추가
+  // 구성원 설정 (기본 이미지 관리용)
+  const [membersConfig, setMembersConfig] = useState<any>(null);
+  const [savingDefaultImg, setSavingDefaultImg] = useState(false);
+
+  // 검색 및 페이지네이션 상태
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8; // 1페이지당 8개 노출
+  const itemsPerPage = 8;
 
   // Category Options Management State
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>(DEFAULT_CATEGORY_OPTIONS);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryOption | null>(null);
+
+  // ⭐️ 구성원 설정(기본 프로필 이미지) 불러오기
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'boardConfigs', 'members'), (snapshot) => {
+      if (snapshot.exists()) {
+        setMembersConfig(snapshot.data());
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const handleUploadDefaultImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSavingDefaultImg(true);
+    const storagePath = `settings/default_member_image_${Date.now()}`;
+    const result = await uploadImageWithFallback(file, storagePath, setUploading);
+    
+    if (result.error && !result.isBase64Fallback) {
+      alert(`기본 이미지 업로드 실패: ${result.error}`);
+      setSavingDefaultImg(false);
+      return;
+    }
+
+    try {
+      await setDoc(doc(db, 'boardConfigs', 'members'), {
+        ...membersConfig,
+        defaultProfileImage: result.url
+      }, { merge: true });
+      alert('기본 프로필 이미지가 성공적으로 저장되었습니다.');
+    } catch (err) {
+      console.error(err);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setSavingDefaultImg(false);
+    }
+  };
 
   // Real-time synchronization for category options
   useEffect(() => {
@@ -393,6 +434,8 @@ export default function MembersManager() {
     return true;
   });
 
+  const defaultProfileImage = membersConfig?.defaultProfileImage || '';
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -428,7 +471,40 @@ export default function MembersManager() {
         </button>
       </div>
 
-      {/* ⭐️ 띄어쓰기 무시 스마트 검색창 추가 */}
+      {/* ⭐️ 구성원 기본 프로필 이미지 설정 영역 */}
+      <div className="bg-gray-50 border border-gray-100 p-6 space-y-4">
+        <div className="space-y-1">
+          <h4 className="text-sm font-bold tracking-tight">구성원 기본 프로필 이미지 설정</h4>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Default Profile Image for Members Without Photo</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="w-16 h-20 bg-gray-200 border border-gray-300 overflow-hidden shrink-0 flex items-center justify-center">
+            {defaultProfileImage ? (
+              <img src={defaultProfileImage} className="w-full h-full object-cover" alt="Default" />
+            ) : (
+              <span className="text-[9px] text-gray-400 text-center px-1">등록된 기본 이미지 없음</span>
+            )}
+          </div>
+          <div className="space-y-2 flex-1">
+            <div className="relative inline-block">
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={handleUploadDefaultImage}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              />
+              <button type="button" className="px-4 py-2 bg-black text-white text-[10px] font-bold uppercase tracking-widest hover:bg-gray-800 cursor-pointer">
+                {savingDefaultImg ? '업로드 중...' : '기본 이미지 업로드 / 변경'}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500">
+              * 프로필 사진이 등록되지 않은 구성원에게 이 기본 이미지가 자동으로 적용됩니다.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 띄어쓰기 무시 스마트 검색창 */}
       <div className="relative z-[40]">
         <div className="flex items-center border border-gray-200 focus-within:border-black transition-colors bg-white">
           <span className="pl-4 text-gray-400">🔍</span>
@@ -499,7 +575,7 @@ export default function MembersManager() {
             type="button"
             onClick={() => {
               setCmsFilter(tab.id);
-              setCurrentPage(1); // 탭 전환 시 1페이지로 초기화
+              setCurrentPage(1);
             }}
             className={`pb-4 text-[10px] font-bold uppercase tracking-widest transition-all relative cursor-pointer ${
               cmsFilter === tab.id ? 'text-black font-extrabold' : 'text-gray-400 hover:text-black'
@@ -522,7 +598,7 @@ export default function MembersManager() {
         ))}
       </div>
 
-      {/* ⭐️ 8개씩 쪼개기 및 페이지네이션 적용 */}
+      {/* 8개씩 쪼개기 및 페이지네이션 적용 */}
       {(() => {
         const totalPages = Math.ceil(filteredCmsMembers.length / itemsPerPage);
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -537,71 +613,75 @@ export default function MembersManager() {
                 등록된 구성원이 없습니다.
               </div>
             ) : (
-              currentCmsMembers.map(member => (
-                <div key={member.id} className="flex items-center justify-between p-6 border border-gray-100 hover:bg-gray-50 transition-all group">
-                  <div className="flex items-center gap-6">
-                    <div className="w-16 h-20 bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
-                      {member.image ? (
-                        <img src={member.image} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300">No Image</div>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-bold tracking-tight">{member.name}</h4>
-                      <div className="text-[10px] text-gray-400 uppercase tracking-widest flex flex-wrap items-center gap-2">
-                        <span className="font-bold text-black border border-black/15 bg-gray-50 px-1.5 py-0.5">
-                          {getCategoryLabel(member.category || '')}
-                        </span>
-                        <span className={`px-1.5 py-0.5 border ${
-                          member.status === 'graduate' 
-                            ? 'border-amber-500/30 bg-amber-50 text-amber-700' 
-                            : member.status === 'completed'
-                            ? 'border-purple-500/30 bg-purple-50 text-purple-700'
-                            : 'border-blue-500/30 bg-blue-50 text-blue-700'
-                        } font-bold`}>
-                          {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
-                        </span>
-                        {member.admissionMajor && (
-                          <span className="px-1.5 py-0.5 border border-gray-200 bg-gray-100 text-gray-800 font-bold">
-                            {normalizeAdmissionMajor(member.admissionMajor)}
-                          </span>
-                        )}
-                        {getMemberPeriod(member) && (
-                          <>
-                            <span>|</span>
-                            <span>{getMemberPeriod(member)}</span>
-                          </>
+              currentCmsMembers.map(member => {
+                // ⭐️ 개별 사진이 없으면 기본 이미지 적용
+                const displayImage = member.image || defaultProfileImage;
+
+                return (
+                  <div key={member.id} className="flex items-center justify-between p-6 border border-gray-100 hover:bg-gray-50 transition-all group">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-20 bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
+                        {displayImage ? (
+                          <img src={displayImage} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300">No Image</div>
                         )}
                       </div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold tracking-tight">{member.name}</h4>
+                        <div className="text-[10px] text-gray-400 uppercase tracking-widest flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-black border border-black/15 bg-gray-50 px-1.5 py-0.5">
+                            {getCategoryLabel(member.category || '')}
+                          </span>
+                          <span className={`px-1.5 py-0.5 border ${
+                            member.status === 'graduate' 
+                              ? 'border-amber-500/30 bg-amber-50 text-amber-700' 
+                              : member.status === 'completed'
+                              ? 'border-purple-500/30 bg-purple-50 text-purple-700'
+                              : 'border-blue-500/30 bg-blue-50 text-blue-700'
+                          } font-bold`}>
+                            {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
+                          </span>
+                          {member.admissionMajor && (
+                            <span className="px-1.5 py-0.5 border border-gray-200 bg-gray-100 text-gray-800 font-bold">
+                              {normalizeAdmissionMajor(member.admissionMajor)}
+                            </span>
+                          )}
+                          {getMemberPeriod(member) && (
+                            <>
+                              <span>|</span>
+                              <span>{getMemberPeriod(member)}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => {
+                          const isCurr = member.isCurrentPeriod ?? (!member.endYear || member.endYear === '현재');
+                          setCurrentMember({
+                            ...member,
+                            isCurrentPeriod: isCurr
+                          });
+                          setIsEditing(true);
+                        }}
+                        className="text-[10px] font-bold text-black uppercase tracking-widest hover:underline cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(member)}
+                        className="text-[10px] font-bold text-red-500 uppercase tracking-widest hover:underline cursor-pointer"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-4">
-                    <button 
-                      onClick={() => {
-                        const isCurr = member.isCurrentPeriod ?? (!member.endYear || member.endYear === '현재');
-                        setCurrentMember({
-                          ...member,
-                          isCurrentPeriod: isCurr
-                        });
-                        setIsEditing(true);
-                      }}
-                      className="text-[10px] font-bold text-black uppercase tracking-widest hover:underline cursor-pointer"
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(member)}
-                      className="text-[10px] font-bold text-red-500 uppercase tracking-widest hover:underline cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
 
-            {/* ⭐️ 하단 페이지 번호 버튼 UI */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 pt-8">
                 <button 
@@ -650,7 +730,6 @@ export default function MembersManager() {
             </div>
 
             <form onSubmit={handleSave} className="space-y-6">
-              {/* 1. 이름 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">이름 *</label>
                 <input 
@@ -663,7 +742,6 @@ export default function MembersManager() {
                 />
               </div>
 
-              {/* 2. 소속 기간 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">소속 기간</label>
@@ -710,7 +788,6 @@ export default function MembersManager() {
                 </div>
               </div>
 
-              {/* 3. 소속 전공 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">소속 전공</label>
                 <div className="flex flex-wrap gap-6 p-4 border border-gray-100 bg-white">
@@ -741,7 +818,6 @@ export default function MembersManager() {
                 </div>
               </div>
 
-              {/* 4. 과정 분류 */}
               <div className="space-y-2.5 p-3.5 border border-gray-100 bg-gray-50/40 rounded-xs">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">과정 분류 *</label>
@@ -786,7 +862,6 @@ export default function MembersManager() {
                 </div>
               </div>
 
-              {/* 5. 상태 분류 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">상태 분류 *</label>
                 <div className="flex flex-wrap gap-4 p-4 border border-gray-100 bg-white">
@@ -827,7 +902,6 @@ export default function MembersManager() {
                 </div>
               </div>
 
-              {/* 6. 프로필 사진 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">프로필 사진</label>
                 <div className="relative group">
@@ -843,7 +917,7 @@ export default function MembersManager() {
                   </div>
                 </div>
                 <p className="text-[9px] text-[#A3A3A3] font-medium leading-normal">
-                  * 최대 20MB 이하의 이미지 파일(PNG, JPG)만 첨부 가능합니다.
+                  * 최대 20MB 이하의 이미지 파일(PNG, JPG)만 첨부 가능합니다. (비워둘 시 CMS에서 설정한 기본 이미지가 적용됩니다.)
                 </p>
                 {currentMember?.image && (
                   <div className="mt-2 w-24 h-32 border border-gray-100 overflow-hidden">
@@ -852,7 +926,6 @@ export default function MembersManager() {
                 )}
               </div>
 
-              {/* 7. 이메일 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">이메일</label>
                 <input 
@@ -864,7 +937,6 @@ export default function MembersManager() {
                 />
               </div>
 
-              {/* 8. 전공 이력 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">전공 이력</label>
                 <input 
@@ -876,7 +948,6 @@ export default function MembersManager() {
                 />
               </div>
 
-              {/* 9. 졸업 논문 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">졸업 논문</label>
                 <input 
@@ -888,7 +959,6 @@ export default function MembersManager() {
                 />
               </div>
 
-              {/* 10. 졸업논문링크 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">졸업논문링크</label>
                 <input 
@@ -900,7 +970,6 @@ export default function MembersManager() {
                 />
               </div>
 
-              {/* 11. 현재 경력 상태 */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">현재 경력 상태</label>
                 <input 
@@ -924,7 +993,6 @@ export default function MembersManager() {
         </motion.div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {memberToDelete && (
         <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <motion.div 
@@ -933,16 +1001,11 @@ export default function MembersManager() {
             className="bg-white p-6 md:p-8 max-w-md w-full border border-gray-100 shadow-2xl space-y-6"
           >
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-lg">
-                !
-              </div>
+              <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-lg">!</div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900 tracking-tight">구성원 삭제 확인</h3>
                 <p className="text-sm text-gray-600 mt-2 leading-relaxed">
                   정말로 <strong className="text-black font-bold">[{memberToDelete.name}]</strong> 구성원 데이터를 삭제하시겠습니까?
-                </p>
-                <p className="text-xs text-red-500 font-medium mt-1">
-                  * 이 작업은 되돌릴 수 없으며, 해당 데이터가 영구 삭제됩니다.
                 </p>
               </div>
             </div>
@@ -968,7 +1031,6 @@ export default function MembersManager() {
         </div>
       )}
 
-      {/* Category Options Management Modal */}
       {isManagingCategories && (
         <div className="fixed inset-0 z-[180] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <motion.div 
@@ -981,12 +1043,7 @@ export default function MembersManager() {
                 <h3 className="text-lg font-bold tracking-tight">과정 분류 선택지 관리</h3>
                 <p className="text-xs text-gray-400 mt-0.5">구성원 등록 및 필터링에 사용되는 과정을 관리합니다.</p>
               </div>
-              <button 
-                onClick={() => setIsManagingCategories(false)}
-                className="text-xs font-bold uppercase tracking-widest hover:underline cursor-pointer"
-              >
-                닫기
-              </button>
+              <button onClick={() => setIsManagingCategories(false)} className="text-xs font-bold uppercase tracking-widest hover:underline cursor-pointer">닫기</button>
             </div>
 
             <form onSubmit={handleAddCategory} className="flex gap-2">
@@ -997,108 +1054,56 @@ export default function MembersManager() {
                 onChange={e => setNewCategoryName(e.target.value)}
                 className="flex-1 p-3 border border-gray-200 focus:border-black outline-none text-sm"
               />
-              <button 
-                type="submit"
-                className="px-4 py-3 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap"
-              >
-                + 추가
-              </button>
+              <button type="submit" className="px-4 py-3 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-gray-800 transition-colors cursor-pointer whitespace-nowrap">+ 추가</button>
             </form>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">등록된 과정 분류 목록 ({categoryOptions.length})</label>
-              {categoryOptions.length === 0 ? (
-                <p className="text-xs text-gray-400 py-4 text-center">등록된 과정 분류 항목이 없습니다.</p>
-              ) : (
-                categoryOptions.map(opt => {
-                  const usageCount = members.filter(m => {
-                    const cat = (m.category || '').trim();
-                    const label = getCategoryLabel(cat);
-                    return cat === opt.key || cat === opt.label || label === opt.label;
-                  }).length;
+              {categoryOptions.map(opt => {
+                const usageCount = members.filter(m => {
+                  const cat = (m.category || '').trim();
+                  const label = getCategoryLabel(cat);
+                  return cat === opt.key || cat === opt.label || label === opt.label;
+                }).length;
 
-                  return (
-                    <div 
-                      key={opt.id} 
-                      className="flex items-center justify-between p-3.5 border border-gray-100 bg-gray-50/50 hover:bg-white transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold text-gray-900">{opt.label}</span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          usageCount > 0 
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                            : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          사용 중: {usageCount}명
-                        </span>
-                      </div>
-
-                      <button 
-                        type="button"
-                        onClick={() => handleRequestDeleteCategory(opt)}
-                        className="px-2.5 py-1 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all cursor-pointer flex items-center gap-1"
-                        title="선택지 삭제"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        <span>삭제</span>
-                      </button>
+                return (
+                  <div key={opt.id} className="flex items-center justify-between p-3.5 border border-gray-100 bg-gray-50/50 hover:bg-white transition-all group">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-gray-900">{opt.label}</span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${usageCount > 0 ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-500'}`}>
+                        사용 중: {usageCount}명
+                      </span>
                     </div>
-                  );
-                })
-              )}
+                    <button type="button" onClick={() => handleRequestDeleteCategory(opt)} className="px-2.5 py-1 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all cursor-pointer">
+                      삭제
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="pt-2 border-t border-gray-100 flex justify-end">
-              <button 
-                onClick={() => setIsManagingCategories(false)}
-                className="px-5 py-2.5 bg-gray-100 text-gray-800 text-xs font-bold uppercase hover:bg-gray-200 transition-colors cursor-pointer"
-              >
-                닫기
-              </button>
+              <button onClick={() => setIsManagingCategories(false)} className="px-5 py-2.5 bg-gray-100 text-gray-800 text-xs font-bold uppercase hover:bg-gray-200 transition-colors cursor-pointer">닫기</button>
             </div>
           </motion.div>
         </div>
       )}
 
-      {/* Delete Category Option Confirmation Modal */}
       {categoryToDelete && (
         <div className="fixed inset-0 z-[220] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-6 md:p-8 max-w-md w-full border border-gray-100 shadow-2xl space-y-6"
-          >
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white p-6 md:p-8 max-w-md w-full border border-gray-100 shadow-2xl space-y-6">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-lg">
-                !
-              </div>
+              <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-lg">!</div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900 tracking-tight">과정 분류 선택지 삭제 확인</h3>
                 <p className="text-sm text-gray-600 mt-2 leading-relaxed">
                   해당 과정 분류 항목 <strong className="text-black font-bold">[{categoryToDelete.label}]</strong>을(를) 삭제하시겠습니까?
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  * 이 과정을 사용 중인 구성원이 0명이므로 데이터 유실 없이 삭제됩니다.
-                </p>
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setCategoryToDelete(null)}
-                className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer transition-colors"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteCategory}
-                className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-700 cursor-pointer transition-colors"
-              >
-                확인 및 삭제
-              </button>
+              <button type="button" onClick={() => setCategoryToDelete(null)} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer">취소</button>
+              <button type="button" onClick={confirmDeleteCategory} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-700 cursor-pointer">확인 및 삭제</button>
             </div>
           </motion.div>
         </div>
