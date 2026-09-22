@@ -23,14 +23,18 @@ export default function Projects() {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ⭐️ 1. 페이지네이션용 상태 추가 (갤러리형 = 6개)
+  // 페이지네이션용 상태 (갤러리형 = 6개)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6; 
+
+  // ⭐️ 프로젝트 프론트 검색용 상태 추가
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const activeTab = searchParams.get('category') || 'all'; // 'all', 'general', 'practical'
 
   const setActiveTab = (tab: string) => {
-    setCurrentPage(1); // ⭐️ 2. 탭이 바뀌면 무조건 1페이지로 돌아가도록 초기화
+    setCurrentPage(1); // 탭이 바뀌면 무조건 1페이지로 돌아가도록 초기화
     if (tab === 'all') {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('category');
@@ -56,14 +60,12 @@ export default function Projects() {
         ...doc.data()
       })) as ProjectItem[];
 
-      // Real-time Database Recovery & Healing Routine for projects with unclassified values
       for (const item of fetchedProjects) {
         if (!item.category || item.category === '' || item.category === '미분류' || item.category === 'unclassified') {
           let correctedCategory = 'general'; // Default fallback
 
           const titleText = (item.title || '') + ' ' + (item.titleEn || '') + ' ' + (item.content || '') + ' ' + (item.affiliation || '');
 
-          // Check keywords for Practical vs General
           if (
             titleText.includes('실무') || 
             titleText.includes('현장') || 
@@ -79,12 +81,10 @@ export default function Projects() {
             correctedCategory = 'general';
           }
 
-          // Permanently correct back to Firestore dynamically
           try {
             await updateDoc(doc(db, 'projects', item.id), {
               category: correctedCategory
             });
-            console.log(`Successfully healed project item [${item.title}] with category: ${correctedCategory}`);
           } catch (err) {
             console.error('Failed to auto-heal project document:', err);
           }
@@ -115,6 +115,11 @@ export default function Projects() {
     return true;
   });
 
+  const getCategoryLabel = (cat: string) => {
+    if (cat === 'practical' || cat === '실무 프로젝트') return '실무 프로젝트';
+    return '연구 프로젝트';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -133,6 +138,57 @@ export default function Projects() {
           </h3>
           <h2 className="text-3xl font-bold tracking-tight uppercase">Project</h2>
         </div>
+      </div>
+
+      {/* ⭐️ 프로젝트 스마트 검색창 추가 (띄어쓰기 무관) */}
+      <div className="relative z-[40] w-full max-w-xl">
+        <div className="flex items-center border-b-2 border-gray-200 focus-within:border-black transition-colors bg-transparent pb-3">
+          <span className="pr-3 text-gray-400">🔍</span>
+          <input 
+            type="text"
+            placeholder="프로젝트 제목 검색 (띄어쓰기 무관)"
+            className="w-full bg-transparent outline-none text-sm font-sans"
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          />
+        </div>
+        
+        <AnimatePresence>
+          {showSuggestions && searchTerm && (
+            <motion.div 
+              initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+              className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-2 max-h-80 overflow-y-auto z-50"
+            >
+              {(() => {
+                const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
+                const queryStr = normalize(searchTerm);
+                const matches = projects.filter(project => normalize(project.title).includes(queryStr) || normalize(project.titleEn as string).includes(queryStr));
+                
+                if (matches.length === 0) return <div className="p-4 text-xs text-gray-400 text-center tracking-widest">검색 결과가 없습니다.</div>;
+                
+                return matches.map(project => (
+                  <div 
+                    key={project.id}
+                    onClick={() => {
+                      // 검색 결과 클릭 시 프로젝트 상세 페이지나 모달 경로로 이동 (프로젝트 카드가 클릭을 처리하듯 상세 이동)
+                      navigate(`/projects/${project.id}`); 
+                      setSearchTerm('');
+                    }}
+                    className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer flex justify-between items-center group transition-colors"
+                  >
+                     <div>
+                       <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{project.title}</p>
+                       <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{getCategoryLabel(project.category)} | {project.year}</p>
+                     </div>
+                     <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">상세보기 ↗</span>
+                  </div>
+                ));
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Modern Filter Tabs */}
@@ -165,7 +221,6 @@ export default function Projects() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
         <AnimatePresence mode="popLayout">
           {filteredProjects.length > 0 ? (
-            // ⭐️ 3. 데이터 6개씩 자르기 로직 적용! (slice)
             filteredProjects.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((project, idx) => (
               <ProjectCard
                 key={project.id}
@@ -185,7 +240,7 @@ export default function Projects() {
         </AnimatePresence>
       </div>
 
-      {/* ⭐️ 4. 하단 페이지 번호 버튼 UI 추가 */}
+      {/* 하단 페이지 번호 버튼 UI */}
       {filteredProjects.length > itemsPerPage && (
         <div className="flex justify-center items-center gap-3 pt-16">
           <button 
