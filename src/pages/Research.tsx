@@ -25,7 +25,7 @@ export default function Research() {
 
   // ⭐️ 페이지네이션용 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8; // 리스트형 = 8개
+  const itemsPerPage = 6; // 리스트형 = 6개
 
   const activeTab = searchParams.get('category') || 'all'; 
 
