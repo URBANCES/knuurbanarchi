@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadImageWithFallback } from '../../lib/uploadHelper';
 import { db, storage } from '../../lib/firebase';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export function normalizeAdmissionMajor(major?: string): string {
   if (!major) return '';
@@ -111,6 +111,12 @@ export default function MembersManager() {
   const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // 검색 및 페이지네이션 상태 추가
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8; // 1페이지당 8개 노출
+
   // Category Options Management State
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>(DEFAULT_CATEGORY_OPTIONS);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
@@ -122,7 +128,6 @@ export default function MembersManager() {
     const q = query(collection(db, 'memberCategories'));
     const unsub = onSnapshot(q, async (snapshot) => {
       if (snapshot.empty) {
-        // Seed default category options into Firestore
         for (const def of DEFAULT_CATEGORY_OPTIONS) {
           try {
             await addDoc(collection(db, 'memberCategories'), {
@@ -217,13 +222,11 @@ export default function MembersManager() {
     const unsub = onSnapshot(q, async (snapshot) => {
       let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member));
 
-      // Self-healing database routine & legacy professor records removal
       const pureMembers: Member[] = [];
       for (const m of fetched) {
         if (m.role === 'professor') {
           try {
             await deleteDoc(doc(db, 'members', m.id));
-            console.log(`Deleted legacy professor member doc from members collection: ${m.name}`);
           } catch (err) {
             console.error(`Error deleting legacy professor [${m.name}]:`, err);
           }
@@ -255,7 +258,6 @@ export default function MembersManager() {
         if (needsUpdate) {
           try {
             await updateDoc(doc(db, 'members', m.id), updates);
-            console.log(`Successfully healed member [${m.name}]`);
           } catch (err) {
             console.error(`Error during self-healing for member [${m.name}]:`, err);
           }
@@ -266,7 +268,6 @@ export default function MembersManager() {
         });
       }
 
-      // Client-side sorting for display
       const sorted = pureMembers.sort((a, b) => {
         const pA = getCategoryPriority(a.category || '');
         const pB = getCategoryPriority(b.category || '');
@@ -283,29 +284,6 @@ export default function MembersManager() {
 
     return () => unsub();
   }, []);
-
-  const checkFileSize = (file: File, inputId?: string): boolean => {
-    const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-    if (file.size > 20 * 1024 * 1024) {
-      alert(`첨부 가능한 파일의 최대 크기는 20MB입니다. 현재 파일은 ${sizeInMB}MB로, 서버 무한 로딩을 방지하기 위해 업로드가 제한됩니다. 이미지 크기를 줄이거나 압축 후 다시 시도해 주세요.`);
-      if (inputId) {
-        const input = document.getElementById(inputId) as HTMLInputElement | null;
-        if (input) input.value = '';
-      }
-      return false;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      const proceed = window.confirm(`첨부하신 파일의 용량이 커서 (${sizeInMB}MB) 업로드 완료까지 1분 이상 소요될 수 있습니다. 진행하시겠습니까?`);
-      if (!proceed) {
-        if (inputId) {
-          const input = document.getElementById(inputId) as HTMLInputElement | null;
-          if (input) input.value = '';
-        }
-        return false;
-      }
-    }
-    return true;
-  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -401,13 +379,12 @@ export default function MembersManager() {
       setMemberToDelete(null);
     } catch (err) {
       console.error('Error deleting member:', err);
-      alert('구성원 삭제 처리 중 오류가 발생했습니다. 권한 및 데이터베이스 상태를 확인해 주세요.');
+      alert('구성원 삭제 처리 중 오류가 발생했습니다.');
     } finally {
       setDeleting(false);
     }
   };
 
-  // Dynamic filter lists for unified CMS dashboard
   const filteredCmsMembers = members.filter(member => {
     if (cmsFilter === 'all') return true;
     if (cmsFilter === 'current') return member.status === 'current' || !member.status;
@@ -451,6 +428,64 @@ export default function MembersManager() {
         </button>
       </div>
 
+      {/* ⭐️ 띄어쓰기 무시 스마트 검색창 추가 */}
+      <div className="relative z-[40]">
+        <div className="flex items-center border border-gray-200 focus-within:border-black transition-colors bg-white">
+          <span className="pl-4 text-gray-400">🔍</span>
+          <input 
+            type="text"
+            placeholder="구성원 이름 검색 (띄어쓰기 무관)"
+            className="w-full p-4 outline-none text-sm font-sans"
+            value={searchTerm}
+            onChange={e => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          />
+        </div>
+        
+        <AnimatePresence>
+          {showSuggestions && searchTerm && (
+            <motion.div 
+              initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+              className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-xl mt-1 max-h-80 overflow-y-auto z-50"
+            >
+              {(() => {
+                const normalize = (str: string) => (str || '').replace(/\s+/g, '').toLowerCase();
+                const queryStr = normalize(searchTerm);
+                const matches = members.filter(member => 
+                  normalize(member.name).includes(queryStr) || 
+                  normalize(member.role as string).includes(queryStr)
+                );
+                
+                if (matches.length === 0) return <div className="p-4 text-xs text-gray-400 text-center tracking-widest">검색 결과가 없습니다.</div>;
+                
+                return matches.map(member => (
+                  <div 
+                    key={member.id}
+                    onClick={() => {
+                      const isCurr = member.isCurrentPeriod ?? (!member.endYear || member.endYear === '현재');
+                      setCurrentMember({
+                        ...member,
+                        isCurrentPeriod: isCurr
+                      });
+                      setIsEditing(true);
+                      setSearchTerm('');
+                    }}
+                    className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer flex justify-between items-center group"
+                  >
+                     <div>
+                       <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{member.name}</p>
+                       <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{getCategoryLabel(member.category || '')} | {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}</p>
+                     </div>
+                     <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">수정하기 📝</span>
+                  </div>
+                ));
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* Dynamic Status Filter Tabs in CMS */}
       <div className="flex gap-8 border-b border-gray-100 pb-px">
         {[
@@ -462,7 +497,10 @@ export default function MembersManager() {
           <button
             key={tab.id}
             type="button"
-            onClick={() => setCmsFilter(tab.id)}
+            onClick={() => {
+              setCmsFilter(tab.id);
+              setCurrentPage(1); // 탭 전환 시 1페이지로 초기화
+            }}
             className={`pb-4 text-[10px] font-bold uppercase tracking-widest transition-all relative cursor-pointer ${
               cmsFilter === tab.id ? 'text-black font-extrabold' : 'text-gray-400 hover:text-black'
             }`}
@@ -484,78 +522,120 @@ export default function MembersManager() {
         ))}
       </div>
 
-      <div className="space-y-4">
-        {loading ? (
-          <div className="text-center py-12 text-gray-400 text-xs uppercase tracking-widest">Loading...</div>
-        ) : filteredCmsMembers.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-gray-200 text-gray-400 text-xs uppercase tracking-widest">
-            등록된 구성원이 없습니다.
-          </div>
-        ) : (
-          filteredCmsMembers.map(member => (
-            <div key={member.id} className="flex items-center justify-between p-6 border border-gray-100 hover:bg-gray-50 transition-all group">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-20 bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
-                  {member.image ? (
-                    <img src={member.image} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300">No Image</div>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-bold tracking-tight">{member.name}</h4>
-                  <div className="text-[10px] text-gray-400 uppercase tracking-widest flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-black border border-black/15 bg-gray-50 px-1.5 py-0.5">
-                      {getCategoryLabel(member.category || '')}
-                    </span>
-                    <span className={`px-1.5 py-0.5 border ${
-                      member.status === 'graduate' 
-                        ? 'border-amber-500/30 bg-amber-50 text-amber-700' 
-                        : member.status === 'completed'
-                        ? 'border-purple-500/30 bg-purple-50 text-purple-700'
-                        : 'border-blue-500/30 bg-blue-50 text-blue-700'
-                    } font-bold`}>
-                      {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
-                    </span>
-                    {member.admissionMajor && (
-                      <span className="px-1.5 py-0.5 border border-gray-200 bg-gray-100 text-gray-800 font-bold">
-                        {normalizeAdmissionMajor(member.admissionMajor)}
-                      </span>
-                    )}
-                    {getMemberPeriod(member) && (
-                      <>
-                        <span>|</span>
-                        <span>{getMemberPeriod(member)}</span>
-                      </>
-                    )}
+      {/* ⭐️ 8개씩 쪼개기 및 페이지네이션 적용 */}
+      {(() => {
+        const totalPages = Math.ceil(filteredCmsMembers.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const currentCmsMembers = filteredCmsMembers.slice(startIndex, startIndex + itemsPerPage);
+
+        return (
+          <div className="space-y-4">
+            {loading ? (
+              <div className="text-center py-12 text-gray-400 text-xs uppercase tracking-widest">Loading...</div>
+            ) : filteredCmsMembers.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-gray-200 text-gray-400 text-xs uppercase tracking-widest">
+                등록된 구성원이 없습니다.
+              </div>
+            ) : (
+              currentCmsMembers.map(member => (
+                <div key={member.id} className="flex items-center justify-between p-6 border border-gray-100 hover:bg-gray-50 transition-all group">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-20 bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-100">
+                      {member.image ? (
+                        <img src={member.image} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300">No Image</div>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold tracking-tight">{member.name}</h4>
+                      <div className="text-[10px] text-gray-400 uppercase tracking-widest flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-black border border-black/15 bg-gray-50 px-1.5 py-0.5">
+                          {getCategoryLabel(member.category || '')}
+                        </span>
+                        <span className={`px-1.5 py-0.5 border ${
+                          member.status === 'graduate' 
+                            ? 'border-amber-500/30 bg-amber-50 text-amber-700' 
+                            : member.status === 'completed'
+                            ? 'border-purple-500/30 bg-purple-50 text-purple-700'
+                            : 'border-blue-500/30 bg-blue-50 text-blue-700'
+                        } font-bold`}>
+                          {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
+                        </span>
+                        {member.admissionMajor && (
+                          <span className="px-1.5 py-0.5 border border-gray-200 bg-gray-100 text-gray-800 font-bold">
+                            {normalizeAdmissionMajor(member.admissionMajor)}
+                          </span>
+                        )}
+                        {getMemberPeriod(member) && (
+                          <>
+                            <span>|</span>
+                            <span>{getMemberPeriod(member)}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => {
+                        const isCurr = member.isCurrentPeriod ?? (!member.endYear || member.endYear === '현재');
+                        setCurrentMember({
+                          ...member,
+                          isCurrentPeriod: isCurr
+                        });
+                        setIsEditing(true);
+                      }}
+                      className="text-[10px] font-bold text-black uppercase tracking-widest hover:underline cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(member)}
+                      className="text-[10px] font-bold text-red-500 uppercase tracking-widest hover:underline cursor-pointer"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-4">
+              ))
+            )}
+
+            {/* ⭐️ 하단 페이지 번호 버튼 UI */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 pt-8">
                 <button 
-                  onClick={() => {
-                    const isCurr = member.isCurrentPeriod ?? (!member.endYear || member.endYear === '현재');
-                    setCurrentMember({
-                      ...member,
-                      isCurrentPeriod: isCurr
-                    });
-                    setIsEditing(true);
-                  }}
-                  className="text-[10px] font-bold text-black uppercase tracking-widest hover:underline cursor-pointer"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
                 >
-                  Edit
+                  &lt;
                 </button>
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-8 h-8 flex items-center justify-center text-[10px] font-bold border transition-all cursor-pointer ${
+                      currentPage === i + 1 
+                        ? 'border-black bg-black text-white' 
+                        : 'border-transparent text-gray-400 hover:text-black hover:border-gray-200'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
                 <button 
-                  onClick={() => handleDelete(member)}
-                  className="text-[10px] font-bold text-red-500 uppercase tracking-widest hover:underline cursor-pointer"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-200 text-xs text-gray-400 hover:text-black hover:border-black disabled:opacity-30 transition-all cursor-pointer"
                 >
-                  Delete
+                  &gt;
                 </button>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            )}
+          </div>
+        );
+      })()}
 
       {isEditing && (
         <motion.div 
@@ -688,7 +768,6 @@ export default function MembersManager() {
                   )}
                 </select>
 
-                {/* Inline Quick Add Category Option */}
                 <div className="flex gap-2 pt-1">
                   <input 
                     type="text"
@@ -910,7 +989,6 @@ export default function MembersManager() {
               </button>
             </div>
 
-            {/* Add New Category Option Form */}
             <form onSubmit={handleAddCategory} className="flex gap-2">
               <input 
                 type="text"
@@ -927,7 +1005,6 @@ export default function MembersManager() {
               </button>
             </form>
 
-            {/* Category Options List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               <label className="text-[10px] font-bold tracking-widest uppercase text-gray-400">등록된 과정 분류 목록 ({categoryOptions.length})</label>
               {categoryOptions.length === 0 ? (
