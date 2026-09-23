@@ -116,7 +116,6 @@ export default function Header() {
     return () => unsub();
   }, []);
 
-  // ⭐️ 구성원(Members) 서브 메뉴를 대학원생/학부연구생으로 개편
   const navItems: NavItem[] = [
     { 
       name: '연구실 소개', 
@@ -134,7 +133,7 @@ export default function Header() {
       name: '구성원', 
       path: '/members',
       subItems: [
-        { name: '전체보기', path: '/members?group=all' },
+        // ⭐️ '전체보기'를 서브 아이템에서 제거했습니다. ('구성원' 텍스트 클릭 시 자동으로 전체보기로 이동됩니다.)
         { name: '대학원생', path: '/members?group=grad' },
         { name: '학부연구생', path: '/members?group=undergrad' },
       ]
