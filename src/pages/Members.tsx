@@ -186,7 +186,7 @@ export default function Members() {
             <h3 className="text-[10px] font-bold tracking-[0.4em] uppercase text-gray-400">
               About / {activeTab === 'all' ? 'All Members' : activeTab === 'grad' ? 'Graduate' : 'Undergraduate'}
             </h3>
-            <h2 className="text-3xl font-bold tracking-tight uppercase">
+            <h2 className="text-3xl font-bold tracking-tight">
               구성원
             </h2>
           </div>
