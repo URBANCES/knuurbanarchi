@@ -24,7 +24,7 @@ export function getCategoryLabel(category: string): string {
   return category || '기타';
 }
 
-// ⭐️ 대학원생 / 학부연구생 판별 함수
+// 대학원생 / 학부연구생 판별 함수
 export function isGradStudent(category: string): boolean {
   const norm = (category || '').toLowerCase();
   return norm.includes('doctor') || norm.includes('ph') || norm.includes('박사') ||
@@ -108,13 +108,14 @@ export default function Members() {
     const unsub = onSnapshot(q, (snapshot) => {
       let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member));
       
-      // ⭐️ 과정(카테고리) 상관없이 '입학년도' 기준 내림차순 정렬 (최신 입학생 먼저) -> 연도가 같으면 이름 가나다순 정렬
+      // ⭐️ 입학년도 기준 오름차순 정렬 (과거 -> 현재 순서) -> 연도가 같으면 이름 가나다순 정렬
       fetched = fetched.sort((a, b) => {
-        const yearA = parseInt(a.startYear || '0', 10);
-        const yearB = parseInt(b.startYear || '0', 10);
+        // 입학년도가 없는(미상) 경우 맨 아래로 보내기 위해 9999로 임시 처리
+        const yearA = parseInt(a.startYear || '9999', 10);
+        const yearB = parseInt(b.startYear || '9999', 10);
         
         if (yearA !== yearB) {
-          return yearB - yearA; // 내림차순 (e.g. 2026 -> 2025 -> 2024)
+          return yearA - yearB; // 오름차순 (e.g. 2024 -> 2025 -> 2026)
         }
 
         const nameA = a.name || '';
@@ -129,7 +130,7 @@ export default function Members() {
     return () => unsub();
   }, []);
 
-  // ⭐️ 탭 상태 ('all', 'grad', 'undergrad')
+  // 탭 상태 ('all', 'grad', 'undergrad')
   const rawQueryCategory = searchParams.get('group');
   const activeTab = rawQueryCategory || 'all';
 
@@ -143,7 +144,7 @@ export default function Members() {
     }
   };
 
-  // ⭐️ 1. 선택된 탭(대학원생/학부연구생)에 따라 구성원 필터링
+  // 1. 선택된 탭(대학원생/학부연구생)에 따라 구성원 필터링
   const filteredMembers = members.filter(member => {
     if (activeTab === 'all') return true;
     if (activeTab === 'grad') return isGradStudent(member.category || '');
@@ -151,7 +152,7 @@ export default function Members() {
     return true;
   });
 
-  // ⭐️ 2. 필터링된 멤버들 중에서 고유한 입학년도 추출 (내림차순 정렬됨)
+  // 2. 필터링된 멤버들 중에서 고유한 입학년도 추출 (오름차순 정렬됨)
   const uniqueYears = Array.from(new Set(filteredMembers.map(m => m.startYear?.trim() || '미상')));
 
   return (
@@ -217,7 +218,7 @@ export default function Members() {
           </AnimatePresence>
         </div>
 
-        {/* ⭐️ 프론트 탭 변경 (대학원생/학부연구생) */}
+        {/* 프론트 탭 변경 (대학원생/학부연구생) */}
         <div className="flex flex-wrap gap-2 justify-start pt-4">
           {[
             { id: 'all', label: '전체보기' },
@@ -256,14 +257,14 @@ export default function Members() {
               className="space-y-20 w-full"
             >
               {filteredMembers.length > 0 ? (
-                // ⭐️ 연도(startYear)를 순회하며 그룹 생성
+                // 연도(startYear)를 순회하며 그룹 생성 (과거 -> 현재 순)
                 uniqueYears.map((year) => {
                   const membersInYear = filteredMembers.filter(m => (m.startYear?.trim() || '미상') === year);
                   if (membersInYear.length === 0) return null;
 
                   return (
                     <div key={year} className="space-y-6">
-                      {/* ⭐️ 입학년도 소제목 및 가름선 */}
+                      {/* 입학년도 소제목 및 가름선 */}
                       <div className="border-b-2 border-black pb-2 mb-6">
                         <h3 className="text-xl font-extrabold tracking-tight text-gray-900">
                           {year === '미상' ? '입학년도 미상' : `${year}년 입학`}
