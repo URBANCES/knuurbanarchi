@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot, where, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSearchParams } from 'react-router-dom';
@@ -10,29 +10,6 @@ export function normalizeAdmissionMajor(major?: string): string {
   if (trimmed === '건축') return '건축학과';
   if (trimmed === '도시 재생' || trimmed === '도시재생') return '도시재생학과';
   return trimmed;
-}
-
-export function getCategoryPriority(category: string): number {
-  const norm = (category || '').trim().toLowerCase();
-  if (norm === 'postdoc' || norm.includes('post-doc') || norm.includes('postdoc') || norm.includes('박사후')) {
-    return 1;
-  }
-  if (norm === 'researcher' || norm.includes('연구원') || norm.includes('researcher')) {
-    return 2;
-  }
-  if (norm === 'doctor' || norm.includes('ph.d') || norm.includes('phd') || norm.includes('doctor') || norm.includes('박사')) {
-    return 3;
-  }
-  if (norm === 'master' || norm.includes('master') || norm.includes('석사')) {
-    return 4;
-  }
-  if (norm.includes('산업대학원') || norm.includes('industry')) {
-    return 5;
-  }
-  if (norm === 'undergrad' || norm.includes('undergraduate') || norm.includes('학부')) {
-    return 6;
-  }
-  return 100;
 }
 
 export function getCategoryLabel(category: string): string {
@@ -125,21 +102,20 @@ export default function Members() {
   useEffect(() => {
     const q = query(
       collection(db, 'members'),
-      where('role', '==', 'member'),
-      orderBy('order', 'asc')
+      where('role', '==', 'member')
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
       let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member));
       
+      // ⭐️ 과정(카테고리) 상관없이 '입학년도' 기준 내림차순 정렬 (최신 입학생 먼저) -> 연도가 같으면 이름 가나다순 정렬
       fetched = fetched.sort((a, b) => {
-        const pA = getCategoryPriority(a.category || '');
-        const pB = getCategoryPriority(b.category || '');
-        if (pA !== pB) return pA - pB;
-
-        const yearA = parseInt(a.startYear || '9999', 10);
-        const yearB = parseInt(b.startYear || '9999', 10);
-        if (yearA !== yearB) return yearA - yearB;
+        const yearA = parseInt(a.startYear || '0', 10);
+        const yearB = parseInt(b.startYear || '0', 10);
+        
+        if (yearA !== yearB) {
+          return yearB - yearA; // 내림차순 (e.g. 2026 -> 2025 -> 2024)
+        }
 
         const nameA = a.name || '';
         const nameB = b.name || '';
@@ -167,7 +143,7 @@ export default function Members() {
     }
   };
 
-  // ⭐️ 선택된 탭에 따라 구성원 필터링
+  // ⭐️ 1. 선택된 탭(대학원생/학부연구생)에 따라 구성원 필터링
   const filteredMembers = members.filter(member => {
     if (activeTab === 'all') return true;
     if (activeTab === 'grad') return isGradStudent(member.category || '');
@@ -175,9 +151,8 @@ export default function Members() {
     return true;
   });
 
-  // 표시할 하위 카테고리 분류 추출
-  const foundCategories = Array.from(new Set(filteredMembers.map(m => m.category || 'master')))
-    .sort((a, b) => getCategoryPriority(a) - getCategoryPriority(b));
+  // ⭐️ 2. 필터링된 멤버들 중에서 고유한 입학년도 추출 (내림차순 정렬됨)
+  const uniqueYears = Array.from(new Set(filteredMembers.map(m => m.startYear?.trim() || '미상')));
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-24 space-y-16">
@@ -185,7 +160,7 @@ export default function Members() {
         <div className="flex flex-col md:flex-row justify-between items-baseline border-b border-gray-100 pb-8 gap-4">
           <div className="space-y-1">
             <h3 className="text-[10px] font-bold tracking-[0.4em] uppercase text-gray-400">
-              About / Members
+              About / {activeTab === 'all' ? 'All Members' : activeTab === 'grad' ? 'Graduate' : 'Undergraduate'}
             </h3>
             <h2 className="text-3xl font-bold tracking-tight uppercase">
               구성원
@@ -278,23 +253,25 @@ export default function Members() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className="space-y-16 w-full"
+              className="space-y-20 w-full"
             >
               {filteredMembers.length > 0 ? (
-                foundCategories.map((cat) => {
-                  const membersInCat = filteredMembers.filter(m => (m.category || 'master') === cat);
-                  if (membersInCat.length === 0) return null;
+                // ⭐️ 연도(startYear)를 순회하며 그룹 생성
+                uniqueYears.map((year) => {
+                  const membersInYear = filteredMembers.filter(m => (m.startYear?.trim() || '미상') === year);
+                  if (membersInYear.length === 0) return null;
 
                   return (
-                    <div key={cat} className="space-y-6">
-                      <div className="border-b border-gray-200 pb-2 mb-6">
-                        <h3 className="text-lg font-bold tracking-tight text-gray-900 uppercase">
-                          {getCategoryLabel(cat)}
+                    <div key={year} className="space-y-6">
+                      {/* ⭐️ 입학년도 소제목 및 가름선 */}
+                      <div className="border-b-2 border-black pb-2 mb-6">
+                        <h3 className="text-xl font-extrabold tracking-tight text-gray-900">
+                          {year === '미상' ? '입학년도 미상' : `${year}년 입학`}
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                        {membersInCat.map((member, idx) => {
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-10">
+                        {membersInYear.map((member, idx) => {
                           const displayImage = member.image || defaultProfileImage;
 
                           return (
@@ -304,7 +281,7 @@ export default function Members() {
                               animate={{ opacity: 1, scale: 1 }}
                               transition={{ delay: idx * 0.03 }}
                               onClick={() => setSelectedMember(member)}
-                              className="space-y-2.5 group bg-white border border-gray-100 p-2.5 flex flex-col justify-between hover:border-black/50 transition-all cursor-pointer hover:shadow-md"
+                              className="space-y-3 group cursor-pointer"
                             >
                               <div>
                                 <div className="overflow-hidden bg-gray-50 border border-gray-100 relative aspect-[3/4]">
@@ -371,7 +348,7 @@ export default function Members() {
                 })
               ) : (
                 <div className="w-full py-24 text-center border border-dashed border-gray-100">
-                  <p className="text-xs text-gray-300 uppercase tracking-widest">해당 과정의 구성원이 없습니다.</p>
+                  <p className="text-xs text-gray-300 uppercase tracking-widest">해당하는 구성원이 없습니다.</p>
                 </div>
               )}
             </motion.div>
