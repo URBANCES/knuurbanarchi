@@ -24,7 +24,6 @@ export function getCategoryLabel(category: string): string {
   return category || '기타';
 }
 
-// ⭐️ 카테고리 우선순위 부여 함수 (박사(1) > 석사(2) > 산업대학원(3) > 기타/학부 등)
 export function getCategoryPriority(category: string): number {
   const norm = (category || '').trim().toLowerCase();
   if (norm === 'doctor' || norm.includes('ph.d') || norm.includes('phd') || norm.includes('doctor') || norm.includes('박사')) {
@@ -48,14 +47,12 @@ export function getCategoryPriority(category: string): number {
   return 100;
 }
 
-// ⭐️ 상태 우선순위 부여 함수 (졸업(1) > 수료(2) > 재학(3))
 export function getStatusPriority(status?: string): number {
   if (status === 'graduate') return 1;
   if (status === 'completed') return 2;
-  return 3; // 'current' 또는 미지정
+  return 3; 
 }
 
-// 대학원생 / 학부연구생 판별 함수
 export function isGradStudent(category: string): boolean {
   const norm = (category || '').toLowerCase();
   return norm.includes('doctor') || norm.includes('ph') || norm.includes('박사') ||
@@ -113,7 +110,7 @@ function getMemberPeriod(member: Member): string | null {
 export default function Members() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -138,30 +135,25 @@ export default function Members() {
     const unsub = onSnapshot(q, (snapshot) => {
       let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member));
       
-      // ⭐️ 요청하신 정렬 규칙 적용
       fetched = fetched.sort((a, b) => {
-        // 1. 입학년도 오름차순 (과거 -> 현재)
         const yearA = parseInt(a.startYear || '9999', 10);
         const yearB = parseInt(b.startYear || '9999', 10);
         if (yearA !== yearB) {
           return yearA - yearB; 
         }
 
-        // 2. 카테고리 순서 (박사 > 석사 > 산업대학원 순)
         const catPrioA = getCategoryPriority(a.category || '');
         const catPrioB = getCategoryPriority(b.category || '');
         if (catPrioA !== catPrioB) {
           return catPrioA - catPrioB;
         }
 
-        // 3. 상태 순서 (졸업 > 수료 > 재학 순)
         const statusPrioA = getStatusPriority(a.status);
         const statusPrioB = getStatusPriority(b.status);
         if (statusPrioA !== statusPrioB) {
           return statusPrioA - statusPrioB;
         }
 
-        // 4. 이름 자음/모음 가나다순 정렬 (localeCompare)
         const nameA = a.name || '';
         const nameB = b.name || '';
         return nameA.localeCompare(nameB, 'ko-KR');
@@ -176,16 +168,6 @@ export default function Members() {
 
   const rawQueryCategory = searchParams.get('group');
   const activeTab = rawQueryCategory || 'all';
-
-  const handleTabChange = (group: string) => {
-    if (group === 'all') {
-      const newParams = new URLSearchParams(searchParams);
-      newParams.delete('group');
-      setSearchParams(newParams);
-    } else {
-      setSearchParams({ group });
-    }
-  };
 
   const filteredMembers = members.filter(member => {
     if (activeTab === 'all') return true;
@@ -256,27 +238,6 @@ export default function Members() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-
-        <div className="flex flex-wrap gap-2 justify-start pt-4">
-          {[
-            { id: 'all', label: '전체보기' },
-            { id: 'grad', label: '대학원생' },
-            { id: 'undergrad', label: '학부연구생' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange(tab.id)}
-              className={`px-8 py-3 text-xs font-bold tracking-widest uppercase transition-all duration-300 cursor-pointer ${
-                activeTab === tab.id 
-                  ? 'bg-[#333333] text-white shadow-lg' 
-                  : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
         </div>
       </div>
 
