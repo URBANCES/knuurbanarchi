@@ -43,8 +43,7 @@ export default function Hero({ latestContent }: HeroProps) {
           transition={{ duration: 1.5 }}
           src={bannerUrl} 
           alt="Urban Landscape"
-          // 👇 원하시는 대로 grayscale(흑백)이나 brightness(밝기)를 수정해 둔 상태라면 그대로 유지해 주세요!
-          className="w-full h-full object-cover grayscale brightness-[0.8]" 
+          className="w-full h-full object-cover brightness-[0.7]" 
           referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/40"></div>
