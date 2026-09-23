@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSearchParams } from 'react-router-dom';
@@ -31,10 +31,14 @@ export default function Research() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // ⭐️ 하위 탭(서브 탭) 상태 추가
+  const [subTab, setSubTab] = useState('all');
+
   const activeTab = searchParams.get('category') || 'all'; 
 
   const setActiveTab = (tab: string) => {
-    setCurrentPage(1); // 탭이 바뀌면 1페이지로 초기화
+    setCurrentPage(1); // 메인 탭이 바뀌면 1페이지로 초기화
+    setSubTab('all');  // ⭐️ 메인 탭이 바뀌면 서브 탭도 '전체'로 초기화
     if (tab === 'all') {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('category');
@@ -44,6 +48,12 @@ export default function Research() {
       newParams.set('category', tab);
       setSearchParams(newParams);
     }
+  };
+
+  // ⭐️ 서브 탭 변경 핸들러 (페이지도 1페이지로 초기화)
+  const handleSubTabChange = (sub: string) => {
+    setSubTab(sub);
+    setCurrentPage(1);
   };
 
   useEffect(() => {
@@ -128,16 +138,32 @@ export default function Research() {
     }
   };
 
+  // ⭐️ 필터링 로직 업데이트 (메인 탭 + 서브 탭 모두 고려)
   const filteredItems = items.filter(item => {
     if (activeTab === 'all') return true;
     
     const cat = item.category || '';
+    
     if (activeTab === 'thesis') {
-      return cat === 'phd' || cat === 'master' || cat === '박사 학위논문' || cat === '석사 학위논문' || item.researchType === 'thesis';
+      const isThesis = cat === 'phd' || cat === 'master' || cat === '박사 학위논문' || cat === '석사 학위논문' || item.researchType === 'thesis';
+      if (!isThesis) return false;
+
+      // 서브 탭 필터링
+      if (subTab === 'phd') return cat === 'phd' || cat === '박사 학위논문';
+      if (subTab === 'master') return cat === 'master' || cat === '석사 학위논문';
+      return true; // subTab이 'all'일 때
     }
+    
     if (activeTab === 'journal') {
-      return cat === 'intl' || cat === 'domestic' || cat === '국외 학술논문' || cat === '국내 학술논문' || item.researchType === 'journal';
+      const isJournal = cat === 'intl' || cat === 'domestic' || cat === '국외 학술논문' || cat === '국내 학술논문' || item.researchType === 'journal';
+      if (!isJournal) return false;
+
+      // 서브 탭 필터링
+      if (subTab === 'intl') return cat === 'intl' || cat === '국외 학술논문';
+      if (subTab === 'domestic') return cat === 'domestic' || cat === '국내 학술논문';
+      return true; // subTab이 'all'일 때
     }
+    
     return true;
   });
 
@@ -233,31 +259,75 @@ export default function Research() {
         </AnimatePresence>
       </div>
 
-      {/* Modern Filter Tabs */}
-      <div className="flex gap-10 justify-center border-b border-gray-100 pb-px">
-        {[
-          { id: 'all', label: '전체' },
-          { id: 'thesis', label: '학위논문' },
-          { id: 'journal', label: '학술논문' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`pb-4 text-[12px] font-bold uppercase tracking-widest transition-all relative cursor-pointer ${
-              activeTab === tab.id ? 'text-black' : 'text-gray-400 hover:text-black'
-            }`}
-          >
-            {tab.label}
-            {activeTab === tab.id && (
-              <motion.div
-                layoutId="researchActiveTabLine"
-                className="absolute bottom-0 left-0 w-full h-[2px] bg-black"
-                transition={{ duration: 0.3 }}
-              />
-            )}
-          </button>
-        ))}
+      {/* Modern Filter Tabs (메인 탭) */}
+      <div className="flex flex-col border-b border-gray-100 pb-px gap-4">
+        <div className="flex gap-10 justify-center">
+          {[
+            { id: 'all', label: '전체' },
+            { id: 'thesis', label: '학위논문' },
+            { id: 'journal', label: '학술논문' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-4 text-[12px] font-bold uppercase tracking-widest transition-all relative cursor-pointer ${
+                activeTab === tab.id ? 'text-black' : 'text-gray-400 hover:text-black'
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <motion.div
+                  layoutId="researchActiveTabLine"
+                  className="absolute bottom-0 left-0 w-full h-[2px] bg-black"
+                  transition={{ duration: 0.3 }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* ⭐️ 학위논문 서브 탭 */}
+      {activeTab === 'thesis' && (
+        <div className="flex gap-8 justify-center -mt-8 pb-4">
+          {[
+            { id: 'all', label: '전체보기' },
+            { id: 'phd', label: '박사논문' },
+            { id: 'master', label: '석사논문' }
+          ].map(sub => (
+            <button
+              key={sub.id}
+              onClick={() => handleSubTabChange(sub.id)}
+              className={`text-[11px] font-bold uppercase tracking-wider pb-1 transition-all cursor-pointer ${
+                subTab === sub.id ? 'text-black border-b-2 border-black' : 'text-gray-400 hover:text-black'
+              }`}
+            >
+              {sub.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ⭐️ 학술논문 서브 탭 */}
+      {activeTab === 'journal' && (
+        <div className="flex gap-8 justify-center -mt-8 pb-4">
+          {[
+            { id: 'all', label: '전체보기' },
+            { id: 'intl', label: '국외논문' },
+            { id: 'domestic', label: '국내논문' }
+          ].map(sub => (
+            <button
+              key={sub.id}
+              onClick={() => handleSubTabChange(sub.id)}
+              className={`text-[11px] font-bold uppercase tracking-wider pb-1 transition-all cursor-pointer ${
+                subTab === sub.id ? 'text-black border-b-2 border-black' : 'text-gray-400 hover:text-black'
+              }`}
+            >
+              {sub.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Combined List Section & Pagination */}
       <div className="px-4 md:px-12 space-y-12">
@@ -321,7 +391,7 @@ export default function Research() {
           </AnimatePresence>
         </div>
 
-        {/* ⭐️ 페이지네이션 버튼 UI (총 페이지가 2페이지 이상일 때만 표시) */}
+        {/* 페이지네이션 버튼 UI (총 페이지가 2페이지 이상일 때만 표시) */}
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-3 pt-8">
             <button 
