@@ -88,7 +88,7 @@ export default function News() {
           {/* Header & Description */}
           <div className="space-y-4">
             <h3 className="text-[10px] font-bold tracking-[0.4em] uppercase text-gray-400 font-mono">Updates</h3>
-            <h2 className="text-4xl font-bold tracking-tight text-black font-sans">News</h2>
+            <h2 className="text-3xl font-bold tracking-tight">소식</h2>
             {config?.description ? (
               <p className="text-xs text-gray-400 leading-relaxed font-light whitespace-pre-wrap pt-2 border-t border-gray-100">
                 {config.description}
