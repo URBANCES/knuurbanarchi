@@ -116,6 +116,7 @@ export default function Header() {
     return () => unsub();
   }, []);
 
+  // ⭐️ 구성원(Members) 서브 메뉴를 대학원생/학부연구생으로 개편
   const navItems: NavItem[] = [
     { 
       name: '연구실 소개', 
@@ -133,9 +134,9 @@ export default function Header() {
       name: '구성원', 
       path: '/members',
       subItems: [
-        { name: '재학생', path: '/members/current' },
-        { name: '수료생', path: '/members/completed' },
-        { name: '졸업생', path: '/members/graduate' },
+        { name: '전체보기', path: '/members?group=all' },
+        { name: '대학원생', path: '/members?group=grad' },
+        { name: '학부연구생', path: '/members?group=undergrad' },
       ]
     },
     { 
@@ -191,7 +192,8 @@ export default function Header() {
             <ul className="flex justify-center gap-8 md:gap-16">
                 {navItems.map((item) => {
                   const isActive = location.pathname.startsWith(item.path) || 
-                    item.subItems?.some(sub => location.pathname === sub.path || location.pathname.startsWith(sub.path + '/'));
+                    item.subItems?.some(sub => location.pathname === sub.path || location.pathname.startsWith(sub.path.split('?')[0] + '/'));
+                  
                   return (
                     <li 
                       key={item.name}
@@ -267,4 +269,3 @@ export default function Header() {
     </>
   );
 }
-
