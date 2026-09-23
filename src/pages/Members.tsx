@@ -47,6 +47,19 @@ export function getCategoryLabel(category: string): string {
   return category || '기타';
 }
 
+// ⭐️ 대학원생 / 학부연구생 판별 함수
+export function isGradStudent(category: string): boolean {
+  const norm = (category || '').toLowerCase();
+  return norm.includes('doctor') || norm.includes('ph') || norm.includes('박사') ||
+         norm.includes('master') || norm.includes('석사') ||
+         norm.includes('industry') || norm.includes('산업대학원');
+}
+
+export function isUndergradStudent(category: string): boolean {
+  const norm = (category || '').toLowerCase();
+  return norm.includes('undergrad') || norm.includes('학부');
+}
+
 interface Member {
   id: string;
   name: string;
@@ -54,8 +67,6 @@ interface Member {
   category?: string;
   status?: 'current' | 'completed' | 'graduate';
   admissionMajor?: string;
-  undergraduateMajor?: string;
-  masterMajor?: string;
   email?: string;
   majorHistory?: string;
   thesisTitle?: string;
@@ -65,8 +76,6 @@ interface Member {
   endYear?: string;
   isCurrentPeriod?: boolean;
   period?: string;
-  affiliation?: string;
-  career?: string;
   image: string;
   order: number;
 }
@@ -93,24 +102,17 @@ function getMemberPeriod(member: Member): string | null {
   return null;
 }
 
-interface MembersProps {
-  defaultStatus?: 'current' | 'graduate' | 'completed' | 'all';
-}
-
-export default function Members({ defaultStatus = 'current' }: MembersProps) {
+export default function Members() {
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // 프론트 검색용 상태
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // ⭐️ CMS에서 설정한 기본 프로필 이미지 상태
   const [defaultProfileImage, setDefaultProfileImage] = useState<string>('');
 
-  // 기본 프로필 이미지 동기화
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'boardConfigs', 'members'), (snapshot) => {
       if (snapshot.exists()) {
@@ -151,54 +153,46 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
     return () => unsub();
   }, []);
 
-  const statusFilteredMembers = members.filter(member => {
-    if (defaultStatus === 'all') return true;
-    const statusOfMember = member.status || 'current';
-    return statusOfMember === defaultStatus;
-  });
-
-  const foundCategories = Array.from(new Set(statusFilteredMembers.map(m => m.category || 'master')))
-    .sort((a, b) => getCategoryPriority(a) - getCategoryPriority(b));
-
-  const uniqueCategories = ['all', ...foundCategories];
-
-  const rawQueryCategory = searchParams.get('category');
+  // ⭐️ 탭 상태 ('all', 'grad', 'undergrad')
+  const rawQueryCategory = searchParams.get('group');
   const activeTab = rawQueryCategory || 'all';
 
-  const handleTabChange = (cat: string) => {
-    if (cat === 'all') {
+  const handleTabChange = (group: string) => {
+    if (group === 'all') {
       const newParams = new URLSearchParams(searchParams);
-      newParams.delete('category');
+      newParams.delete('group');
       setSearchParams(newParams);
     } else {
-      setSearchParams({ category: cat });
+      setSearchParams({ group });
     }
   };
 
-  const isAllView = defaultStatus === 'all';
-
-  const finalFilteredMembers = statusFilteredMembers.filter(member => {
-    if (isAllView || activeTab === 'all') return true;
-    const rawCat = member.category || 'master';
-    return rawCat === activeTab;
+  // ⭐️ 선택된 탭에 따라 구성원 필터링
+  const filteredMembers = members.filter(member => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'grad') return isGradStudent(member.category || '');
+    if (activeTab === 'undergrad') return isUndergradStudent(member.category || '');
+    return true;
   });
 
+  // 표시할 하위 카테고리 분류 추출
+  const foundCategories = Array.from(new Set(filteredMembers.map(m => m.category || 'master')))
+    .sort((a, b) => getCategoryPriority(a) - getCategoryPriority(b));
+
   return (
-    <div className={`max-w-7xl mx-auto px-6 py-24 ${isAllView ? 'space-y-8' : 'space-y-16'}`}>
-      {/* Header & Dynamic Title Block */}
-      <div className={isAllView ? 'space-y-0' : 'space-y-12'}>
+    <div className="max-w-7xl mx-auto px-6 py-24 space-y-16">
+      <div className="space-y-12">
         <div className="flex flex-col md:flex-row justify-between items-baseline border-b border-gray-100 pb-8 gap-4">
           <div className="space-y-1">
             <h3 className="text-[10px] font-bold tracking-[0.4em] uppercase text-gray-400">
-              About / {isAllView ? 'All' : defaultStatus === 'graduate' ? 'Alumni' : defaultStatus === 'completed' ? 'Completed' : 'Undergraduate'}
+              About / Members
             </h3>
             <h2 className="text-3xl font-bold tracking-tight uppercase">
-              {isAllView ? '전체 구성원' : defaultStatus === 'graduate' ? '졸업생' : defaultStatus === 'completed' ? '수료생' : '재학생'}
+              구성원
             </h2>
           </div>
         </div>
 
-        {/* 스마트 검색창 */}
         <div className="relative z-[40] w-full max-w-xl">
           <div className="flex items-center border-b-2 border-gray-200 focus-within:border-black transition-colors bg-transparent pb-3">
             <span className="pr-3 text-gray-400">🔍</span>
@@ -248,27 +242,29 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
           </AnimatePresence>
         </div>
 
-        {!isAllView && foundCategories.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-start pt-4">
-            {uniqueCategories.map(cat => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => handleTabChange(cat)}
-                className={`px-8 py-3 text-xs font-bold tracking-widest uppercase transition-all duration-300 cursor-pointer ${
-                  activeTab === cat 
-                    ? 'bg-[#333333] text-white shadow-lg' 
-                    : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                }`}
-              >
-                {cat === 'all' ? '전체보기' : getCategoryLabel(cat)}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* ⭐️ 프론트 탭 변경 (대학원생/학부연구생) */}
+        <div className="flex flex-wrap gap-2 justify-start pt-4">
+          {[
+            { id: 'all', label: '전체보기' },
+            { id: 'grad', label: '대학원생' },
+            { id: 'undergrad', label: '학부연구생' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleTabChange(tab.id)}
+              className={`px-8 py-3 text-xs font-bold tracking-widest uppercase transition-all duration-300 cursor-pointer ${
+                activeTab === tab.id 
+                  ? 'bg-[#333333] text-white shadow-lg' 
+                  : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Grid of Profile Cards */}
       <div className="min-h-[400px]">
         {loading ? (
           <div className="flex items-center justify-center py-24">
@@ -277,35 +273,28 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
         ) : (
          <AnimatePresence mode="wait">
             <motion.div
-              key={`${defaultStatus}-${activeTab}`}
+              key={activeTab}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
               className="space-y-16 w-full"
             >
-              {finalFilteredMembers.length > 0 ? (
-                (isAllView || activeTab === 'all' ? foundCategories : [activeTab]).map((cat) => {
-                  const membersInCat = finalFilteredMembers.filter(m => (m.category || 'master') === cat);
+              {filteredMembers.length > 0 ? (
+                foundCategories.map((cat) => {
+                  const membersInCat = filteredMembers.filter(m => (m.category || 'master') === cat);
                   if (membersInCat.length === 0) return null;
 
                   return (
                     <div key={cat} className="space-y-6">
-                      {(isAllView || activeTab === 'all') && (
-                        <div className="border-b border-gray-200 pb-2 mb-6">
-                          <h3 className="text-lg font-bold tracking-tight text-gray-900 uppercase">
-                            {getCategoryLabel(cat)}
-                          </h3>
-                        </div>
-                      )}
+                      <div className="border-b border-gray-200 pb-2 mb-6">
+                        <h3 className="text-lg font-bold tracking-tight text-gray-900 uppercase">
+                          {getCategoryLabel(cat)}
+                        </h3>
+                      </div>
 
-                      <div className={
-                        isAllView 
-                          ? "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2" 
-                          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16"
-                      }>
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
                         {membersInCat.map((member, idx) => {
-                          // ⭐️ 개별 사진이 없으면 기본 이미지 적용
                           const displayImage = member.image || defaultProfileImage;
 
                           return (
@@ -315,11 +304,7 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
                               animate={{ opacity: 1, scale: 1 }}
                               transition={{ delay: idx * 0.03 }}
                               onClick={() => setSelectedMember(member)}
-                              className={
-                                isAllView
-                                  ? "space-y-2.5 group bg-white border border-gray-100 p-2.5 flex flex-col justify-between hover:border-black/50 transition-all cursor-pointer hover:shadow-md"
-                                  : "space-y-3 group cursor-pointer"
-                              }
+                              className="space-y-2.5 group bg-white border border-gray-100 p-2.5 flex flex-col justify-between hover:border-black/50 transition-all cursor-pointer hover:shadow-md"
                             >
                               <div>
                                 <div className="overflow-hidden bg-gray-50 border border-gray-100 relative aspect-[3/4]">
@@ -394,7 +379,6 @@ export default function Members({ defaultStatus = 'current' }: MembersProps) {
         )}
       </div>
 
-      {/* Profile Detail Popup Modal */}
       <AnimatePresence>
         {selectedMember && (() => {
           const displayImage = selectedMember.image || defaultProfileImage;
