@@ -179,7 +179,7 @@ export default function Research() {
           <h3 className="text-[10px] font-bold tracking-[0.4em] uppercase text-gray-400">
             RESEARCH / {activeTab === 'all' ? 'ALL' : activeTab.toUpperCase()}
           </h3>
-          <h2 className="text-3xl font-bold tracking-tight uppercase">Research</h2>
+          <h2 className="text-3xl font-bold tracking-tight">연구실적</h2>
         </div>
       </div>
 
