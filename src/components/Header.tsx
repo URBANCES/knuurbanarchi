@@ -123,7 +123,7 @@ export default function Header() {
     },
     { 
       name: '연구활동', 
-      path: '/research',
+      path: '#',
       subItems: [
         { name: '연구실적', path: '/research' },
         { name: '프로젝트', path: '/projects' },
@@ -203,6 +203,9 @@ export default function Header() {
                         to={item.path}
                         className="block text-xs font-bold tracking-[0.25em] uppercase group transition-all duration-300 ease-in-out py-1"
                         onFocus={() => setHoveredItem(item.name)}
+                        onClick={(e) => {
+                          if (item.path === '#') e.preventDefault();
+                        }}
                       >
                         {item.name}
                         <motion.div 
