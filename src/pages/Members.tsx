@@ -263,9 +263,10 @@ export default function Members() {
 
                   return (
                     <div key={year} className="space-y-8">
+                      {/* ⭐️ 소제목을 연도 숫자만 표시 (예: 2013) */}
                       <div className="border-b-2 border-black pb-2 mb-8">
                         <h3 className="text-xl font-extrabold tracking-tight text-gray-900">
-                          {year === '미상' ? '입학년도 미상' : `${year}년 입학`}
+                          {year === '미상' ? '입학년도 미상' : year}
                         </h3>
                       </div>
 
