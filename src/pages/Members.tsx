@@ -81,7 +81,6 @@ function getMemberPeriod(member: Member): string | null {
 
 export default function Members() {
   const [members, setMembers] = useState<Member[]>([]);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -108,14 +107,13 @@ export default function Members() {
     const unsub = onSnapshot(q, (snapshot) => {
       let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member));
       
-      // ⭐️ 입학년도 기준 오름차순 정렬 (과거 -> 현재 순서) -> 연도가 같으면 이름 가나다순 정렬
+      // 입학년도 기준 오름차순 정렬 (과거 -> 현재 순서) -> 연도가 같으면 이름 가나다순 정렬
       fetched = fetched.sort((a, b) => {
-        // 입학년도가 없는(미상) 경우 맨 아래로 보내기 위해 9999로 임시 처리
         const yearA = parseInt(a.startYear || '9999', 10);
         const yearB = parseInt(b.startYear || '9999', 10);
         
         if (yearA !== yearB) {
-          return yearA - yearB; // 오름차순 (e.g. 2024 -> 2025 -> 2026)
+          return yearA - yearB; 
         }
 
         const nameA = a.name || '';
@@ -144,7 +142,7 @@ export default function Members() {
     }
   };
 
-  // 1. 선택된 탭(대학원생/학부연구생)에 따라 구성원 필터링
+  // 1. 선택된 탭에 따라 구성원 필터링
   const filteredMembers = members.filter(member => {
     if (activeTab === 'all') return true;
     if (activeTab === 'grad') return isGradStudent(member.category || '');
@@ -152,7 +150,7 @@ export default function Members() {
     return true;
   });
 
-  // 2. 필터링된 멤버들 중에서 고유한 입학년도 추출 (오름차순 정렬됨)
+  // 2. 필터링된 멤버들 중에서 고유한 입학년도 추출
   const uniqueYears = Array.from(new Set(filteredMembers.map(m => m.startYear?.trim() || '미상')));
 
   return (
@@ -200,7 +198,7 @@ export default function Members() {
                     <div 
                       key={member.id}
                       onClick={() => {
-                        setSelectedMember(member);
+                        // 검색 시 해당 화면 스크롤 기능 추가 시 활용 가능
                         setSearchTerm('');
                       }}
                       className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer flex justify-between items-center group transition-colors"
@@ -209,7 +207,7 @@ export default function Members() {
                          <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{member.name}</p>
                          <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{getCategoryLabel(member.category || '')} | {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}</p>
                        </div>
-                       <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">프로필 보기 ↗</span>
+                       <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">이동 ↗</span>
                     </div>
                   ));
                 })()}
@@ -218,7 +216,7 @@ export default function Members() {
           </AnimatePresence>
         </div>
 
-        {/* 프론트 탭 변경 (대학원생/학부연구생) */}
+        {/* 프론트 탭 변경 */}
         <div className="flex flex-wrap gap-2 justify-start pt-4">
           {[
             { id: 'all', label: '전체보기' },
@@ -254,75 +252,64 @@ export default function Members() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className="space-y-20 w-full"
+              className="space-y-24 w-full"
             >
               {filteredMembers.length > 0 ? (
-                // 연도(startYear)를 순회하며 그룹 생성 (과거 -> 현재 순)
                 uniqueYears.map((year) => {
                   const membersInYear = filteredMembers.filter(m => (m.startYear?.trim() || '미상') === year);
                   if (membersInYear.length === 0) return null;
 
                   return (
-                    <div key={year} className="space-y-6">
+                    <div key={year} className="space-y-8">
                       {/* 입학년도 소제목 및 가름선 */}
-                      <div className="border-b-2 border-black pb-2 mb-6">
+                      <div className="border-b-2 border-black pb-2 mb-8">
                         <h3 className="text-xl font-extrabold tracking-tight text-gray-900">
                           {year === '미상' ? '입학년도 미상' : `${year}년 입학`}
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-10">
+                      {/* ⭐️ 상세 정보를 바로 노출하는 가로형 카드 그리드 (1열 혹은 넓은 화면에서 2열) */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {membersInYear.map((member, idx) => {
                           const displayImage = member.image || defaultProfileImage;
 
                           return (
                             <motion.div
                               key={member.id}
-                              initial={{ opacity: 0, scale: 0.95 }}
+                              initial={{ opacity: 0, scale: 0.98 }}
                               animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: idx * 0.03 }}
-                              onClick={() => setSelectedMember(member)}
-                              className="space-y-3 group cursor-pointer"
+                              transition={{ delay: idx * 0.05 }}
+                              className="flex flex-col sm:flex-row gap-6 p-6 border border-gray-100 bg-white hover:border-gray-300 hover:shadow-sm transition-all group"
                             >
-                              <div>
-                                <div className="overflow-hidden bg-gray-50 border border-gray-100 relative aspect-[3/4]">
-                                  {displayImage ? (
-                                    <img 
-                                      src={displayImage} 
-                                      alt={member.name}
-                                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300 uppercase tracking-widest">No Image</div>
-                                  )}
-                                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <span className="text-[10px] font-bold text-white uppercase tracking-widest bg-black/70 px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                      상세보기 +
-                                    </span>
-                                  </div>
-                                </div>
+                              {/* 좌측: 프로필 이미지 */}
+                              <div className="w-full sm:w-36 md:w-40 shrink-0 aspect-[3/4] bg-gray-50 border border-gray-100 overflow-hidden relative">
+                                {displayImage ? (
+                                  <img 
+                                    src={displayImage} 
+                                    alt={member.name}
+                                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300 uppercase tracking-widest">No Image</div>
+                                )}
+                              </div>
 
-                                <div className="pt-2.5 flex justify-between items-start gap-2">
-                                  <div className="flex-1 min-w-0 space-y-0.5 text-left">
-                                    <h4 className="text-sm font-bold tracking-tight text-gray-900 truncate leading-snug group-hover:text-black transition-colors">
-                                      {member.name}
-                                    </h4>
-                                    <p className="text-xs font-medium text-gray-500 truncate leading-normal">
+                              {/* 우측: 상세 정보 */}
+                              <div className="flex-1 min-w-0 flex flex-col justify-start">
+                                {/* 이름 및 상태 뱃지 */}
+                                <div className="flex justify-between items-start gap-4 mb-4">
+                                  <div className="space-y-1">
+                                    <h4 className="text-lg md:text-xl font-bold tracking-tight text-gray-900 group-hover:text-black transition-colors">{member.name}</h4>
+                                    <p className="text-xs font-medium text-gray-500">
                                       {getCategoryLabel(member.category || '')}
                                       {member.admissionMajor && (
-                                        <span className="text-gray-500 font-normal"> / {normalizeAdmissionMajor(member.admissionMajor)}</span>
+                                        <span className="font-normal text-gray-400"> / {normalizeAdmissionMajor(member.admissionMajor)}</span>
                                       )}
                                     </p>
-                                    {member.email && (
-                                      <p className="text-[10px] font-normal text-gray-400 truncate leading-normal">
-                                        {member.email}
-                                      </p>
-                                    )}
                                   </div>
-
-                                  <div className="flex-shrink-0 flex flex-col items-end text-right space-y-1">
-                                    <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded-xs text-right whitespace-nowrap ${
+                                  <div className="flex flex-col items-end gap-1.5 shrink-0 text-right">
+                                    <span className={`text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-xs text-right whitespace-nowrap ${
                                       member.status === 'graduate' 
                                         ? 'bg-amber-50 text-amber-800 border border-amber-200/60' 
                                         : member.status === 'completed'
@@ -331,13 +318,64 @@ export default function Members() {
                                     }`}>
                                       {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
                                     </span>
-
                                     {getMemberPeriod(member) && (
-                                      <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap text-right">
+                                      <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap">
                                         {getMemberPeriod(member)}
                                       </span>
                                     )}
                                   </div>
+                                </div>
+
+                                {/* 상세 이력 (모달 팝업 대신 카드에 직접 출력) */}
+                                <div className="border-t border-gray-100 pt-4 space-y-3 flex-1">
+                                  {member.email?.trim() && (
+                                    <div className="flex items-start gap-3 text-xs">
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">이메일</span>
+                                      <a href={`mailto:${member.email.trim()}`} className="text-gray-700 hover:text-black hover:underline break-all">{member.email.trim()}</a>
+                                    </div>
+                                  )}
+                                  
+                                  {member.majorHistory?.trim() && (
+                                    <div className="flex items-start gap-3 text-xs">
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">전공이력</span>
+                                      <span className="text-gray-700 leading-relaxed font-medium">{member.majorHistory.trim()}</span>
+                                    </div>
+                                  )}
+
+                                  {member.thesisTitle?.trim() && (
+                                    <div className="flex items-start gap-3 text-xs">
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">졸업논문</span>
+                                      <span className="text-gray-700 leading-relaxed font-medium">{member.thesisTitle.trim()}</span>
+                                    </div>
+                                  )}
+
+                                  {member.thesisUrl?.trim() && (
+                                    <div className="flex items-start gap-3 text-xs">
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">논문링크</span>
+                                      <a 
+                                        href={member.thesisUrl.trim().startsWith('http') ? member.thesisUrl.trim() : `https://${member.thesisUrl.trim()}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="text-blue-600 hover:text-blue-800 hover:underline break-all inline-flex items-center gap-1 font-semibold"
+                                      >
+                                        <span>Link</span>
+                                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  {member.currentCareer?.trim() && (
+                                    <div className="flex items-start gap-3 text-xs">
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">현재경력</span>
+                                      <span className="text-gray-700 leading-relaxed font-medium">{member.currentCareer.trim()}</span>
+                                    </div>
+                                  )}
+
+                                  {!member.email?.trim() && !member.majorHistory?.trim() && !member.thesisTitle?.trim() && !member.thesisUrl?.trim() && !member.currentCareer?.trim() && (
+                                    <div className="pt-2">
+                                      <p className="text-xs text-gray-300 italic font-medium">등록된 상세 이력 정보가 없습니다.</p>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </motion.div>
@@ -356,151 +394,6 @@ export default function Members() {
          </AnimatePresence>
         )}
       </div>
-
-      <AnimatePresence>
-        {selectedMember && (() => {
-          const displayImage = selectedMember.image || defaultProfileImage;
-
-          return (
-            <div 
-              className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 md:p-6 overflow-y-auto"
-              onClick={() => setSelectedMember(null)}
-            >
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                transition={{ duration: 0.2 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-white p-6 md:p-8 max-w-2xl w-full border border-gray-100 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto"
-              >
-                <button 
-                  type="button"
-                  onClick={() => setSelectedMember(null)}
-                  className="absolute top-6 right-6 text-gray-400 hover:text-black transition-colors p-1 rounded-full cursor-pointer"
-                  aria-label="닫기"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-
-                <div className="border-b border-gray-100 pb-4 pr-10">
-                  <div className="flex items-baseline gap-3 flex-wrap">
-                    <h3 className="text-2xl font-bold tracking-tight text-gray-900">{selectedMember.name}</h3>
-                    <span className={`text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-xs ${
-                      selectedMember.status === 'graduate' 
-                        ? 'bg-amber-50 text-amber-800 border border-amber-200/60' 
-                        : selectedMember.status === 'completed'
-                        ? 'bg-purple-50 text-purple-800 border border-purple-200/60'
-                        : 'bg-blue-50 text-blue-800 border border-blue-200/60'
-                    }`}>
-                      {selectedMember.status === 'graduate' ? '졸업' : selectedMember.status === 'completed' ? '수료' : '재학'}
-                    </span>
-                  </div>
-                  <p className="text-xs font-semibold text-gray-500 mt-1">
-                    {getCategoryLabel(selectedMember.category || '')}
-                    {selectedMember.admissionMajor && (
-                      <span className="font-normal text-gray-500"> / {normalizeAdmissionMajor(selectedMember.admissionMajor)}</span>
-                    )}
-                    {getMemberPeriod(selectedMember) && (
-                      <span className="font-normal text-gray-400"> ({getMemberPeriod(selectedMember)})</span>
-                    )}
-                  </p>
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
-                  <div className="w-full md:w-52 shrink-0 aspect-[3/4] bg-gray-50 border border-gray-100 overflow-hidden relative rounded-xs">
-                    {displayImage ? (
-                      <img 
-                        src={displayImage} 
-                        alt={selectedMember.name} 
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-300 uppercase tracking-widest">
-                        No Image
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 space-y-4 w-full text-left">
-                    {selectedMember.email?.trim() && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">이메일</span>
-                        <a 
-                          href={`mailto:${selectedMember.email.trim()}`}
-                          className="text-sm font-semibold text-gray-900 hover:text-black hover:underline break-all inline-flex items-center gap-1.5"
-                        >
-                          <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                          <span>{selectedMember.email.trim()}</span>
-                        </a>
-                      </div>
-                    )}
-
-                    {selectedMember.majorHistory?.trim() && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">전공 이력</span>
-                        <p className="text-sm text-gray-800 leading-relaxed font-medium">
-                          {selectedMember.majorHistory.trim()}
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedMember.thesisTitle?.trim() && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">졸업 논문</span>
-                        <p className="text-sm text-gray-800 leading-relaxed font-medium">
-                          {selectedMember.thesisTitle.trim()}
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedMember.thesisUrl?.trim() && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">졸업논문링크</span>
-                        <a 
-                          href={selectedMember.thesisUrl.trim().startsWith('http') ? selectedMember.thesisUrl.trim() : `https://${selectedMember.thesisUrl.trim()}`}
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline break-all inline-flex items-center gap-1"
-                        >
-                          <span>{selectedMember.thesisUrl.trim()}</span>
-                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                      </div>
-                    )}
-
-                    {selectedMember.currentCareer?.trim() && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block">현재 경력 상태</span>
-                        <p className="text-sm text-gray-800 leading-relaxed font-medium">
-                          {selectedMember.currentCareer.trim()}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-100 flex justify-end">
-                  <button 
-                    type="button"
-                    onClick={() => setSelectedMember(null)}
-                    className="px-5 py-2.5 bg-gray-100 text-gray-800 text-xs font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors cursor-pointer"
-                  >
-                    닫기
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          );
-        })()}
-      </AnimatePresence>
     </div>
   );
 }
