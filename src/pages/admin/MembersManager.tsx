@@ -26,8 +26,11 @@ export function getCategoryPriority(category: string): number {
   if (norm === 'master' || norm.includes('master') || norm.includes('석사')) {
     return 4;
   }
-  if (norm === 'undergrad' || norm.includes('undergraduate') || norm.includes('학부')) {
+  if (norm.includes('산업대학원') || norm.includes('industry')) {
     return 5;
+  }
+  if (norm === 'undergrad' || norm.includes('undergraduate') || norm.includes('학부')) {
+    return 6;
   }
   return 100;
 }
@@ -38,9 +41,23 @@ export function getCategoryLabel(category: string): string {
   if (norm === 'researcher' || norm.includes('연구원') || norm.includes('researcher')) return '연구원';
   if (norm === 'doctor' || norm.includes('ph.d') || norm.includes('phd') || norm.includes('doctor') || norm.includes('박사')) return '박사과정';
   if (norm === 'master' || norm.includes('master') || norm.includes('석사')) return '석사과정';
+  if (norm.includes('산업대학원') || norm.includes('industry')) return '산업대학원';
   if (norm === 'undergrad' || norm.includes('undergraduate') || norm.includes('학부')) return '학부연구생';
   if (norm === 'professor' || norm.includes('교수')) return '교수';
   return category || '기타';
+}
+
+// ⭐️ 대학원생 / 학부연구생 판별 함수 추가
+export function isGradStudent(category: string): boolean {
+  const norm = (category || '').toLowerCase();
+  return norm.includes('doctor') || norm.includes('ph') || norm.includes('박사') ||
+         norm.includes('master') || norm.includes('석사') ||
+         norm.includes('industry') || norm.includes('산업대학원');
+}
+
+export function isUndergradStudent(category: string): boolean {
+  const norm = (category || '').toLowerCase();
+  return norm.includes('undergrad') || norm.includes('학부');
 }
 
 interface Member {
@@ -74,9 +91,10 @@ export interface CategoryOption {
 const DEFAULT_CATEGORY_OPTIONS: CategoryOption[] = [
   { id: 'doctor', key: 'doctor', label: '박사과정', order: 1 },
   { id: 'master', key: 'master', label: '석사과정', order: 2 },
-  { id: 'undergrad', key: 'undergrad', label: '학부연구생', order: 3 },
-  { id: 'postdoc', key: 'postdoc', label: '박사후연구원', order: 4 },
-  { id: 'researcher', key: 'researcher', label: '연구원', order: 5 },
+  { id: 'industry', key: 'industry', label: '산업대학원', order: 3 },
+  { id: 'undergrad', key: 'undergrad', label: '학부연구생', order: 4 },
+  { id: 'postdoc', key: 'postdoc', label: '박사후연구원', order: 5 },
+  { id: 'researcher', key: 'researcher', label: '연구원', order: 6 },
 ];
 
 export function getMemberPeriod(member: Member): string | null {
@@ -111,23 +129,19 @@ export default function MembersManager() {
   const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // 구성원 설정 (기본 이미지 관리용)
   const [membersConfig, setMembersConfig] = useState<any>(null);
   const [savingDefaultImg, setSavingDefaultImg] = useState(false);
 
-  // 검색 및 페이지네이션 상태
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // Category Options Management State
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>(DEFAULT_CATEGORY_OPTIONS);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryOption | null>(null);
 
-  // ⭐️ 구성원 설정(기본 프로필 이미지) 불러오기
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'boardConfigs', 'members'), (snapshot) => {
       if (snapshot.exists()) {
@@ -141,7 +155,6 @@ export default function MembersManager() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // ⭐️ 파이어스토어 문서 용량 제한(1MB) 초과 방지를 위한 1MB 이하 제한
     if (file.size > 1 * 1024 * 1024) {
       alert('기본 프로필 이미지는 1MB 이하의 파일만 업로드 가능합니다. 이미지 크기를 줄이거나 압축 후 다시 시도해 주세요.');
       e.target.value = '';
@@ -160,7 +173,6 @@ export default function MembersManager() {
         return;
       }
 
-      // ⭐️ membersConfig가 비어있어도 안전하게 객체 생성
       await setDoc(doc(db, 'boardConfigs', 'members'), {
         ...(membersConfig || {}),
         defaultProfileImage: result.url
@@ -176,7 +188,6 @@ export default function MembersManager() {
     }
   };
 
-  // Real-time synchronization for category options
   useEffect(() => {
     const q = query(collection(db, 'memberCategories'));
     const unsub = onSnapshot(q, async (snapshot) => {
@@ -248,13 +259,10 @@ export default function MembersManager() {
       return cat === opt.key || cat === opt.label || label === opt.label;
     });
 
-    const inUseCount = inUseMembers.length;
-
-    if (inUseCount > 0) {
-      alert(`현재 이 과정을 사용 중인 구성원이 ${inUseCount}명 있습니다. 해당 구성원들의 과정을 다른 것으로 변경한 후 삭제해 주세요.`);
+    if (inUseMembers.length > 0) {
+      alert(`현재 이 과정을 사용 중인 구성원이 ${inUseMembers.length}명 있습니다. 해당 구성원들의 과정을 다른 것으로 변경한 후 삭제해 주세요.`);
       return;
     }
-
     setCategoryToDelete(opt);
   };
 
@@ -280,9 +288,7 @@ export default function MembersManager() {
         if (m.role === 'professor') {
           try {
             await deleteDoc(doc(db, 'members', m.id));
-          } catch (err) {
-            console.error(`Error deleting legacy professor [${m.name}]:`, err);
-          }
+          } catch (err) {}
           continue;
         }
 
@@ -311,9 +317,7 @@ export default function MembersManager() {
         if (needsUpdate) {
           try {
             await updateDoc(doc(db, 'members', m.id), updates);
-          } catch (err) {
-            console.error(`Error during self-healing for member [${m.name}]:`, err);
-          }
+          } catch (err) {}
         }
         pureMembers.push({
           ...m,
@@ -347,7 +351,7 @@ export default function MembersManager() {
       if (result.error) {
         if (result.isBase64Fallback) {
           setCurrentMember({ ...currentMember, image: result.url });
-          alert(`${result.error}\n\n* 안정성 확보를 위해 연구원 사진을 로컬 Base64 데이터 형식으로 인코딩하여 임시 저장 완료하였습니다. 정보 저장을 완료하시면 적용됩니다.`);
+          alert(`${result.error}\n\n* 안정성 확보를 위해 연구원 사진을 로컬 Base64 데이터 형식으로 인코딩하여 임시 저장 완료하였습니다.`);
         } else {
           alert(`구성원 사진 업로드 제한: ${result.error}`);
           const input = document.getElementById('member-file-input') as HTMLInputElement | null;
@@ -438,11 +442,11 @@ export default function MembersManager() {
     }
   };
 
+  // ⭐️ CMS 탭 필터링 로직 수정 (대학원생 / 학부연구생)
   const filteredCmsMembers = members.filter(member => {
     if (cmsFilter === 'all') return true;
-    if (cmsFilter === 'current') return member.status === 'current' || !member.status;
-    if (cmsFilter === 'completed') return member.status === 'completed';
-    if (cmsFilter === 'graduate') return member.status === 'graduate';
+    if (cmsFilter === 'grad') return isGradStudent(member.category || '');
+    if (cmsFilter === 'undergrad') return isUndergradStudent(member.category || '');
     return true;
   });
 
@@ -483,7 +487,6 @@ export default function MembersManager() {
         </button>
       </div>
 
-      {/* ⭐️ 구성원 기본 프로필 이미지 설정 영역 */}
       <div className="bg-gray-50 border border-gray-100 p-6 space-y-4">
         <div className="space-y-1">
           <h4 className="text-sm font-bold tracking-tight">구성원 기본 프로필 이미지 설정</h4>
@@ -516,7 +519,6 @@ export default function MembersManager() {
         </div>
       </div>
 
-      {/* 띄어쓰기 무시 스마트 검색창 */}
       <div className="relative z-[40]">
         <div className="flex items-center border border-gray-200 focus-within:border-black transition-colors bg-white">
           <span className="pl-4 text-gray-400">🔍</span>
@@ -574,13 +576,12 @@ export default function MembersManager() {
         </AnimatePresence>
       </div>
 
-      {/* Dynamic Status Filter Tabs in CMS */}
+      {/* ⭐️ CMS 필터 탭 (대학원생/학부연구생으로 변경) */}
       <div className="flex gap-8 border-b border-gray-100 pb-px">
         {[
           { id: 'all', label: '전체' },
-          { id: 'current', label: '재학' },
-          { id: 'completed', label: '수료' },
-          { id: 'graduate', label: '졸업' }
+          { id: 'grad', label: '대학원생' },
+          { id: 'undergrad', label: '학부연구생' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -595,9 +596,8 @@ export default function MembersManager() {
           >
             {tab.label} ({
               tab.id === 'all' ? members.length :
-              tab.id === 'current' ? members.filter(m => m.status === 'current' || !m.status).length :
-              tab.id === 'completed' ? members.filter(m => m.status === 'completed').length :
-              members.filter(m => m.status === 'graduate').length
+              tab.id === 'grad' ? members.filter(m => isGradStudent(m.category || '')).length :
+              members.filter(m => isUndergradStudent(m.category || '')).length
             })
             {cmsFilter === tab.id && (
               <motion.div
@@ -626,7 +626,6 @@ export default function MembersManager() {
               </div>
             ) : (
               currentCmsMembers.map(member => {
-                // ⭐️ 개별 사진이 없으면 기본 이미지 적용
                 const displayImage = member.image || defaultProfileImage;
 
                 return (
