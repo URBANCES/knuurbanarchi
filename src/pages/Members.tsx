@@ -334,21 +334,21 @@ export default function Members() {
                                   
                                   {member.majorHistory?.trim() && (
                                     <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">전공이력</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">전공이력</span>
                                       <span className="text-gray-700 leading-relaxed font-medium">{member.majorHistory.trim()}</span>
                                     </div>
                                   )}
 
                                   {member.thesisTitle?.trim() && (
                                     <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">졸업논문</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">졸업논문</span>
                                       <span className="text-gray-700 leading-relaxed font-medium">{member.thesisTitle.trim()}</span>
                                     </div>
                                   )}
 
                                   {member.thesisUrl?.trim() && (
                                     <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">논문링크</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">논문링크</span>
                                       <a 
                                         href={member.thesisUrl.trim().startsWith('http') ? member.thesisUrl.trim() : `https://${member.thesisUrl.trim()}`} 
                                         target="_blank" 
@@ -363,7 +363,7 @@ export default function Members() {
 
                                   {member.currentCareer?.trim() && (
                                     <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">현재경력</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">현재경력</span>
                                       <span className="text-gray-700 leading-relaxed font-medium">{member.currentCareer.trim()}</span>
                                     </div>
                                   )}
