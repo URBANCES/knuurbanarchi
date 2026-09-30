@@ -6,7 +6,12 @@ import { motion } from 'motion/react';
 export default function SettingsManager() {
   const [themeColor, setThemeColor] = useState('#000000');
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
-  const [pointColor, setPointColor] = useState('#000000'); // ⭐️ Point Color 상태 추가
+  const [pointColor, setPointColor] = useState('#000000');
+  
+  // ⭐️ 배너 이미지 설정 상태 추가
+  const [bannerImageUrl, setBannerImageUrl] = useState('');
+  const [bodyImageUrl, setBodyImageUrl] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -17,14 +22,25 @@ export default function SettingsManager() {
 
   const fetchSettings = async () => {
     try {
-      const docRef = doc(db, 'settings', 'site');
-      const docSnap = await getDoc(docRef);
+      // 1. 색상 설정 불러오기 (settings/site)
+      const siteDocRef = doc(db, 'settings', 'site');
+      const siteDocSnap = await getDoc(siteDocRef);
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+      if (siteDocSnap.exists()) {
+        const data = siteDocSnap.data();
         setThemeColor(data.themeColor || '#000000');
         setBackgroundColor(data.backgroundColor || '#ffffff');
-        setPointColor(data.pointColor || '#000000'); // ⭐️ 저장된 Point Color 불러오기
+        setPointColor(data.pointColor || '#000000');
+      }
+
+      // 2. 배너 이미지 설정 불러오기 (settings/lab)
+      const labDocRef = doc(db, 'settings', 'lab');
+      const labDocSnap = await getDoc(labDocRef);
+
+      if (labDocSnap.exists()) {
+        const data = labDocSnap.data();
+        setBannerImageUrl(data.bannerImageUrl || '');
+        setBodyImageUrl(data.bodyImageUrl || '');
       }
     } catch (error) {
       console.error('설정 불러오기 실패:', error);
@@ -39,16 +55,23 @@ export default function SettingsManager() {
     setMessage('');
 
     try {
+      // 1. 색상 설정 저장 (settings/site)
       await setDoc(doc(db, 'settings', 'site'), {
         themeColor,
         backgroundColor,
-        pointColor, // ⭐️ DB에 Point Color 저장하기
+        pointColor,
+        updatedAt: new Date()
+      }, { merge: true });
+
+      // 2. 배너 이미지 설정 저장 (settings/lab)
+      await setDoc(doc(db, 'settings', 'lab'), {
+        bannerImageUrl,
+        bodyImageUrl,
         updatedAt: new Date()
       }, { merge: true });
       
-      setMessage('사이트 설정이 성공적으로 저장되었습니다.');
+      setMessage('사이트 및 배너 설정이 성공적으로 저장되었습니다.');
       
-      // 알림 메시지 3초 후 삭제
       setTimeout(() => {
         setMessage('');
       }, 3000);
@@ -77,69 +100,103 @@ export default function SettingsManager() {
       <div className="border-b border-gray-100 pb-4">
         <h3 className="text-xl font-bold tracking-tight">사이트 설정</h3>
         <p className="text-xs text-gray-400 mt-2">
-          웹사이트 전체에 적용되는 테마 색상과 배경 색상, 포인트 색상을 관리합니다.
+          웹사이트 전체의 색상 테마와 소개 페이지 배너 이미지를 관리합니다.
         </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-8 max-w-2xl">
-        <div className="space-y-6">
-          {/* THEME COLOR */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">Theme Color (헤더 드롭다운 등)</label>
-            <div className="flex gap-4 items-center">
-              <input
-                type="color"
-                value={themeColor}
-                onChange={(e) => setThemeColor(e.target.value)}
-                className="w-12 h-12 p-1 border border-gray-200 cursor-pointer"
-              />
-              <input
-                type="text"
-                value={themeColor}
-                onChange={(e) => setThemeColor(e.target.value)}
-                className="flex-1 p-2 text-sm border border-gray-200 outline-none uppercase font-mono"
-                placeholder="#000000"
-              />
+        <div className="space-y-8">
+          {/* 색상 설정 구역 */}
+          <div className="space-y-6 pb-6 border-b border-gray-100">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-black">🎨 컬러 테마 설정</h4>
+            
+            {/* THEME COLOR */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">Theme Color (헤더 드롭다운 등)</label>
+              <div className="flex gap-4 items-center">
+                <input
+                  type="color"
+                  value={themeColor}
+                  onChange={(e) => setThemeColor(e.target.value)}
+                  className="w-12 h-12 p-1 border border-gray-200 cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={themeColor}
+                  onChange={(e) => setThemeColor(e.target.value)}
+                  className="flex-1 p-2 text-sm border border-gray-200 outline-none uppercase font-mono"
+                  placeholder="#000000"
+                />
+              </div>
+            </div>
+
+            {/* BACKGROUND COLOR */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">Background Color (사이트 배경색)</label>
+              <div className="flex gap-4 items-center">
+                <input
+                  type="color"
+                  value={backgroundColor}
+                  onChange={(e) => setBackgroundColor(e.target.value)}
+                  className="w-12 h-12 p-1 border border-gray-200 cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={backgroundColor}
+                  onChange={(e) => setBackgroundColor(e.target.value)}
+                  className="flex-1 p-2 text-sm border border-gray-200 outline-none uppercase font-mono"
+                  placeholder="#ffffff"
+                />
+              </div>
+            </div>
+
+            {/* POINT COLOR */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">Point Color (스크롤 버튼 및 가름선 등)</label>
+              <div className="flex gap-4 items-center">
+                <input
+                  type="color"
+                  value={pointColor}
+                  onChange={(e) => setPointColor(e.target.value)}
+                  className="w-12 h-12 p-1 border border-gray-200 cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={pointColor}
+                  onChange={(e) => setPointColor(e.target.value)}
+                  className="flex-1 p-2 text-sm border border-gray-200 outline-none uppercase font-mono"
+                  placeholder="#000000"
+                />
+              </div>
             </div>
           </div>
 
-          {/* BACKGROUND COLOR */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">Background Color (사이트 배경, 가름선 등)</label>
-            <div className="flex gap-4 items-center">
-              <input
-                type="color"
-                value={backgroundColor}
-                onChange={(e) => setBackgroundColor(e.target.value)}
-                className="w-12 h-12 p-1 border border-gray-200 cursor-pointer"
-              />
-              <input
-                type="text"
-                value={backgroundColor}
-                onChange={(e) => setBackgroundColor(e.target.value)}
-                className="flex-1 p-2 text-sm border border-gray-200 outline-none uppercase font-mono"
-                placeholder="#ffffff"
-              />
-            </div>
-          </div>
+          {/* ⭐️ 배너 이미지 설정 구역 (다시 추가됨) */}
+          <div className="space-y-6">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-black">🖼️ 소개 페이지 배너 이미지 설정</h4>
 
-          {/* ⭐️ POINT COLOR (새로 추가됨) */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">Point Color (스크롤 상단 버튼 등)</label>
-            <div className="flex gap-4 items-center">
-              <input
-                type="color"
-                value={pointColor}
-                onChange={(e) => setPointColor(e.target.value)}
-                className="w-12 h-12 p-1 border border-gray-200 cursor-pointer"
-              />
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">상단 배너 이미지 URL (Banner Image URL)</label>
               <input
                 type="text"
-                value={pointColor}
-                onChange={(e) => setPointColor(e.target.value)}
-                className="flex-1 p-2 text-sm border border-gray-200 outline-none uppercase font-mono"
-                placeholder="#000000"
+                value={bannerImageUrl}
+                onChange={(e) => setBannerImageUrl(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-200 outline-none font-mono"
+                placeholder="https://images.unsplash.com/..."
               />
+              <p className="text-[11px] text-gray-400 mt-1">연구실 소개 페이지 우측 상단에 표시되는 메인 이미지 주소입니다.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">본문 삽입 이미지 URL (Body Image URL)</label>
+              <input
+                type="text"
+                value={bodyImageUrl}
+                onChange={(e) => setBodyImageUrl(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-200 outline-none font-mono"
+                placeholder="https://images.unsplash.com/..."
+              />
+              <p className="text-[11px] text-gray-400 mt-1">철학 및 비전 소개 하단에 추가로 삽입되는 이미지 주소입니다. (비워두면 숨겨집니다)</p>
             </div>
           </div>
         </div>
@@ -153,7 +210,7 @@ export default function SettingsManager() {
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-black text-white font-bold py-4 uppercase tracking-widest text-xs hover:bg-gray-800 transition-colors disabled:opacity-50"
+          className="w-full bg-black text-white font-bold py-4 uppercase tracking-widest text-xs hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer"
         >
           {saving ? '저장 중...' : '설정 저장'}
         </button>
