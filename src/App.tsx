@@ -68,6 +68,13 @@ export default function App() {
         } else {
           document.documentElement.style.removeProperty('--theme-color');
         }
+
+        // ⭐️ 3. Point Color 적용 (새로 추가)
+        if (data.pointColor) {
+          document.documentElement.style.setProperty('--point-color', data.pointColor);
+        } else {
+          document.documentElement.style.removeProperty('--point-color');
+        }
       }
     });
     
