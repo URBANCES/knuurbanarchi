@@ -38,14 +38,13 @@ html {
 }
 
 @layer utilities {
-  /* Tailwind처럼 편하게 쓰기 위한 커스텀 클래스들 */
-  .bg-theme {
-    background-color: var(--theme-color) !important;
-  }
-  .text-theme {
-    color: var(--theme-color) !important;
-  }
-  .border-theme {
-    border-color: var(--theme-color) !important;
-  }
+  /* Theme Color (모션 헤더 등에 사용) */
+  .bg-theme { background-color: var(--theme-color) !important; }
+  .text-theme { color: var(--theme-color) !important; }
+  .border-theme { border-color: var(--theme-color) !important; }
+
+  /* Background Color (버튼, 가름선 등에 사용) ⭐️ 추가된 부분 */
+  .bg-sitebg { background-color: var(--bg-color) !important; }
+  .text-sitebg { color: var(--bg-color) !important; }
+  .border-sitebg { border-color: var(--bg-color) !important; }
 }
