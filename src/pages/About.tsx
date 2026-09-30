@@ -105,7 +105,7 @@ export default function About() {
       </motion.section>
 
       {/* Decorative Elegant Divider */}
-      <div className="border-t border-gray-100 my-32 md:my-40 relative">
+      <div className="border-t border-gray-100 my-16 md:my-20 relative">
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-8 text-[11px] font-bold tracking-[0.6em] text-gray-300 uppercase font-sans">
           Professor Profile
         </span>
@@ -181,10 +181,10 @@ export default function About() {
             </div>
 
             {/* Right: Detailed Records (Detailed Records Column) */}
-            <div className="lg:col-span-8 space-y-24">
+            <div className="lg:col-span-8 space-y-12">
               {/* Representative Greeting (Introduction) */}
               {profData.introduction && (
-                <div className="space-y-8 pb-16 border-b border-gray-100">
+                <div className="space-y-8 pb-8 border-b border-gray-100">
                   <div className="space-y-2">
                     <h3 className="text-2xl font-bold tracking-tight text-black leading-tight font-sans">
                       {profData.introduction.split('\n')[0]}
