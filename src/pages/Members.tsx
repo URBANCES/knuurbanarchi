@@ -326,7 +326,7 @@ export default function Members() {
 
                                 <div className="border-t border-gray-100 pt-4 space-y-3 flex-1">
                                   {member.email?.trim() && (
-                                    <div className="flex items-start gap-3 text-[11.5px]">
+                                    <div className="flex items-start gap-3 text-[11px]">
                                       <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11px] mt-0.5">이메일</span>
                                       <a href={`mailto:${member.email.trim()}`} className="text-gray-700 hover:text-black hover:underline break-all">{member.email.trim()}</a>
                                     </div>
