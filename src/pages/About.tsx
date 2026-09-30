@@ -128,8 +128,8 @@ export default function About() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-32">
-            {/* Left: Profile & Key Specs (학력, 경력, 수상경력) */}
-            <div className="lg:col-span-4 space-y-16">
+            {/* Left: Profile & Key Specs (학력, 경력 등 주요 스펙) */}
+            <div className="lg:col-span-4 space-y-12">
               <div className="aspect-square bg-gray-50 border border-gray-100 overflow-hidden">
                 {profData.image ? (
                    <img 
@@ -143,7 +143,8 @@ export default function About() {
                 )}
               </div>
 
-              <div className="space-y-12">
+              {/* ⭐️ 주요 스펙 영역: '연도 | 내용' 형식이면 연도와 내용이 나뉘어 정렬되도록 개선 */}
+              <div className="space-y-10">
                 {profData.specs?.map((spec, idx) => (
                   <div key={idx} className="space-y-2">
                     <div className="flex items-center gap-3">
@@ -151,7 +152,28 @@ export default function About() {
                       <h4 className="text-xs font-bold tracking-widest uppercase text-black font-sans">{spec.label}</h4>
                     </div>
                     <div className="pl-4.5">
-                      <p className="text-[12px] text-gray-600 leading-[1.8] font-light whitespace-pre-wrap font-sans">{spec.content}</p>
+                      <div className="space-y-1.5 font-sans">
+                        {spec.content.split('\n').map((line, lIdx) => {
+                          const trimmed = line.trim();
+                          if (!trimmed) return null;
+                          const hasYear = trimmed.includes('|');
+                          const year = hasYear ? trimmed.split('|')[0].trim() : '';
+                          const text = hasYear ? trimmed.split('|').slice(1).join('|').trim() : trimmed;
+
+                          return (
+                            <div key={lIdx} className="text-[11.5px] text-gray-600 leading-[1.6] font-light">
+                              {hasYear ? (
+                                <div className="flex gap-2">
+                                  <span className="font-bold text-black shrink-0 w-16">{year}</span>
+                                  <span className="flex-1">{text}</span>
+                                </div>
+                              ) : (
+                                <span>{text}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 ))}
