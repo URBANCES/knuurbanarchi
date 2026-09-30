@@ -120,7 +120,7 @@ export default function About() {
           className="space-y-24"
         >
           {/* Header - Precise authoritative style */}
-          <div className="text-center space-y-4 mb-24">
+          <div className="text-center space-y-2 mb-2">
             <h4 className="text-[12px] font-bold tracking-[0.6em] uppercase text-gray-400 font-sans">도시 및 건축설계</h4>
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight uppercase font-sans">
               {profData.name} 교수
@@ -145,10 +145,10 @@ export default function About() {
 
               <div className="space-y-12">
                 {profData.specs?.map((spec, idx) => (
-                  <div key={idx} className="space-y-4">
+                  <div key={idx} className="space-y-2">
                     <div className="flex items-center gap-3">
                       <div className="w-1.5 h-1.5 bg-black"></div>
-                      <h4 className="text-sm font-bold tracking-widest uppercase text-black font-sans">{spec.label}</h4>
+                      <h4 className="text-xs font-bold tracking-widest uppercase text-black font-sans">{spec.label}</h4>
                     </div>
                     <div className="pl-4.5">
                       <p className="text-[12px] text-gray-600 leading-[1.8] font-light whitespace-pre-wrap font-sans">{spec.content}</p>
