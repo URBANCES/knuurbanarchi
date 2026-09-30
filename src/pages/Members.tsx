@@ -327,28 +327,28 @@ export default function Members() {
                                 <div className="border-t border-gray-100 pt-4 space-y-3 flex-1">
                                   {member.email?.trim() && (
                                     <div className="flex items-start gap-3 text-[11.5px]">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11.5px] mt-0.5">이메일</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11px] mt-0.5">이메일</span>
                                       <a href={`mailto:${member.email.trim()}`} className="text-gray-700 hover:text-black hover:underline break-all">{member.email.trim()}</a>
                                     </div>
                                   )}
                                   
                                   {member.majorHistory?.trim() && (
                                     <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">전공이력</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11px] mt-0.5">전공이력</span>
                                       <span className="text-gray-700 leading-relaxed font-medium">{member.majorHistory.trim()}</span>
                                     </div>
                                   )}
 
                                   {member.thesisTitle?.trim() && (
                                     <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">졸업논문</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11px] mt-0.5">졸업논문</span>
                                       <span className="text-gray-700 leading-relaxed font-medium">{member.thesisTitle.trim()}</span>
                                     </div>
                                   )}
 
                                   {member.thesisUrl?.trim() && (
                                     <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">논문링크</span>
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11px] mt-0.5">논문링크</span>
                                       <a 
                                         href={member.thesisUrl.trim().startsWith('http') ? member.thesisUrl.trim() : `https://${member.thesisUrl.trim()}`} 
                                         target="_blank" 
