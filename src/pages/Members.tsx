@@ -299,7 +299,7 @@ export default function Members() {
                                 <div className="flex justify-between items-start gap-4 mb-4">
                                   <div className="space-y-1">
                                     <h4 className="text-lg md:text-xl font-bold tracking-tight text-gray-900 group-hover:text-black transition-colors">{member.name}</h4>
-                                    <p className="text-[11px] font-medium text-gray-500">
+                                    <p className="text-[12px] font-medium text-gray-500">
                                       {getCategoryLabel(member.category || '')}
                                       {member.admissionMajor && (
                                         <span className="font-normal text-gray-400"> / {normalizeAdmissionMajor(member.admissionMajor)}</span>
@@ -317,7 +317,7 @@ export default function Members() {
                                       {member.status === 'graduate' ? '졸업' : member.status === 'completed' ? '수료' : '재학'}
                                     </span>
                                     {getMemberPeriod(member) && (
-                                      <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap">
+                                      <span className="text-[12px] font-medium text-gray-400 whitespace-nowrap">
                                         {getMemberPeriod(member)}
                                       </span>
                                     )}
@@ -326,8 +326,8 @@ export default function Members() {
 
                                 <div className="border-t border-gray-100 pt-4 space-y-3 flex-1">
                                   {member.email?.trim() && (
-                                    <div className="flex items-start gap-3 text-[11px]">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11px] mt-0.5">이메일</span>
+                                    <div className="flex items-start gap-3 text-[12px]">
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[12px] mt-0.5">이메일</span>
                                       <a href={`mailto:${member.email.trim()}`} className="text-gray-700 hover:text-black hover:underline break-all">{member.email.trim()}</a>
                                     </div>
                                   )}
