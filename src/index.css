@@ -62,19 +62,24 @@ html {
      ⭐️ 마법의 규칙: 가름선들만 자동으로 찾아 색상 덮어쓰기 
      ================================================== */
      
+  @layer utilities {
+  /* ==================================================
+     ⭐️️ 가름선들이 이제 --point-color(포인트 컬러)를 따르도록 변경!
+     ================================================== */
+     
   /* 1. 제목 밑줄 등 '테두리'로 만든 가름선 (border-b-2 + border-black 조합) */
   .border-b-2.border-black,
   .border-b.border-black {
-    border-color: var(--bg-color, #000000) !important;
+    border-color: var(--point-color, #000000) !important;
   }
 
   /* 2. 탭 아래 애니메이션 가름선 등 '얇은 상자'로 만든 가름선 (h-[2px] + bg-black 조합) */
   .h-\[2px\].bg-black {
-    background-color: var(--bg-color, #000000) !important;
+    background-color: var(--point-color, #000000) !important;
   }
 
   /* 3. 홈 화면의 주요 연구실적 등 '굵고 짧은' 가름선 (h-1.5 + bg-black 조합) */
   .h-1\.5.bg-black {
-    background-color: var(--bg-color, #000000) !important;
+    background-color: var(--point-color, #000000) !important;
   }
 }
