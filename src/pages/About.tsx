@@ -120,7 +120,7 @@ export default function About() {
           className="space-y-24"
         >
           {/* Header - Precise authoritative style */}
-          <div className="text-center space-y-4 mb-24">
+          <div className="text-center space-y-2 mb-24">
             <h4 className="text-[12px] font-bold tracking-[0.6em] uppercase text-gray-400 font-sans">도시 및 건축설계</h4>
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight uppercase font-sans">
               {profData.name} 교수
