@@ -28,3 +28,24 @@ html {
 .grayscale:hover {
   filter: grayscale(0%);
 }
+
+@layer base {
+  :root {
+    /* 색상 설정이 없을 때 적용될 기본값 */
+    --theme-color: #000000; 
+    --bg-color: #ffffff;
+  }
+}
+
+@layer utilities {
+  /* Tailwind처럼 편하게 쓰기 위한 커스텀 클래스들 */
+  .bg-theme {
+    background-color: var(--theme-color) !important;
+  }
+  .text-theme {
+    color: var(--theme-color) !important;
+  }
+  .border-theme {
+    border-color: var(--theme-color) !important;
+  }
+}
