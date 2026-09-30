@@ -94,10 +94,10 @@ export default function Home() {
               <img
                 src={homeBanners[currentBannerIdx]}
                 alt={`Home Banner ${currentBannerIdx + 1}`}
-                className="w-full h-full object-cover opacity-80"
+                className="w-full h-full object-cover opacity-90"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-black/30"></div>
+              <div className="absolute inset-0 bg-black/10"></div>
             </motion.div>
           </AnimatePresence>
 
