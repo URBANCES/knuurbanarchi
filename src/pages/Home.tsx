@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, where, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Hero from '../components/Hero';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import ProjectCard from '../components/ProjectCard';
 
 import { useAuth } from '../App';
@@ -13,21 +13,32 @@ export default function Home() {
   const [recentProjects, setRecentProjects] = useState<any[]>([]);
   const [recentResearch, setRecentResearch] = useState<any[]>([]);
   const [recentNews, setRecentNews] = useState<any[]>([]);
-  const [latestContent, setLatestContent] = useState<any[]>([]);
+  const [homeBanners, setHomeBanners] = useState<string[]>([]);
+  const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
 
   useEffect(() => {
-    // Fetch 6 recent research items (published only)
+    // 1. 홈페이지 첫 화면 배너 이미지 불러오기 (settings/home)
+    const unsubHome = onSnapshot(doc(db, 'settings', 'home'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.homeBannerImageUrls && Array.isArray(data.homeBannerImageUrls)) {
+          setHomeBanners(data.homeBannerImageUrls);
+        }
+      }
+    });
+
+    // 2. 연구실적 불러오기
     const qResearch = query(
       collection(db, 'research'), 
       where('isPublished', '==', true),
       orderBy('createdAt', 'desc'), 
-      limit(10) // Fetch more to filter showOnHome in memory if needed, or just use where
+      limit(10)
     );
     const unsubResearch = onSnapshot(qResearch, (snapshot) => {
       setRecentResearch(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'research' })));
     });
 
-    // Fetch 4 recent projects (published only)
+    // 3. 프로젝트 불러오기
     const qProjects = query(
       collection(db, 'projects'), 
       where('isPublished', '==', true),
@@ -38,7 +49,7 @@ export default function Home() {
       setRecentProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'projects' })));
     });
 
-    // Fetch latest from news (published only)
+    // 4. 소식 불러오기
     const qNews = query(
       collection(db, 'news'), 
       where('isPublished', '==', true),
@@ -50,31 +61,65 @@ export default function Home() {
     });
 
     return () => {
+      unsubHome();
       unsubResearch();
       unsubProjects();
       unsubNews();
     };
   }, []);
 
-  // Combine and sort for "Latest 4"
+  // 배너가 여러 장일 경우 5초마다 자동 슬라이드 전환
   useEffect(() => {
-    const combined = [...recentResearch, ...recentProjects, ...recentNews]
-      .filter(item => item.showOnHome !== false)
-      .sort((a, b) => {
-        // Sort by sortOrder (asc) then year (desc)
-        if ((a.sortOrder || 0) !== (b.sortOrder || 0)) {
-          return (a.sortOrder || 0) - (b.sortOrder || 0);
-        }
-        const dateA = a.year ? new Date(a.year).getTime() : (a.createdAt?.seconds * 1000 || 0);
-        const dateB = b.year ? new Date(b.year).getTime() : (b.createdAt?.seconds * 1000 || 0);
-        return dateB - dateA;
-      }).slice(0, 4);
-    setLatestContent(combined);
-  }, [recentResearch, recentProjects, recentNews]);
+    if (homeBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBannerIdx((prev) => (prev + 1) % homeBanners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [homeBanners.length]);
 
   return (
     <div className="space-y-48 pb-48">
-      <Hero />
+      {/* ⭐️ 홈페이지 첫 화면 배너 슬라이드 영역 (등록된 이미지가 있다면 슬라이드로 표시) */}
+      {homeBanners.length > 0 ? (
+        <div className="relative w-full h-[60vh] md:h-[75vh] bg-gray-900 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentBannerIdx}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1 }}
+              className="absolute inset-0"
+            >
+              <img
+                src={homeBanners[currentBannerIdx]}
+                alt={`Home Banner ${currentBannerIdx + 1}`}
+                className="w-full h-full object-cover opacity-80"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-black/30"></div>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* 슬라이드 인디케이터 점 버튼 */}
+          {homeBanners.length > 1 && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+              {homeBanners.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentBannerIdx(idx)}
+                  className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
+                    idx === currentBannerIdx ? 'bg-white w-6' : 'bg-white/50'
+                  }`}
+                  aria-label={`Slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <Hero />
+      )}
 
       {/* Section A: Research List (6 items) */}
       <section className="max-w-7xl mx-auto px-6">
@@ -106,12 +151,12 @@ export default function Home() {
                     viewport={{ once: true }}
                     className="group border-b border-gray-100"
                   >
-                      <div 
-                        onClick={() => item.url && window.open(item.url, '_blank', 'noopener,noreferrer')}
-                        className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-8 py-8 group-hover:pl-4 transition-all duration-500 ${item.url ? 'cursor-pointer' : ''}`}
-                      >
+                    <div 
+                      onClick={() => item.url && window.open(item.url, '_blank', 'noopener,noreferrer')}
+                      className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-8 py-8 group-hover:pl-4 transition-all duration-500 ${item.url ? 'cursor-pointer' : ''}`}
+                    >
                       <div className="flex-1 min-w-0 space-y-1 pr-0 md:pr-4">
-                        <h4 className="text-[16px] font-medium tracking-tight leading-snug group-hover:text-gray-400 transition-colors break-words">
+                        <h4 className="text-[16px] font-medium tracking-tight leading-snug group-hover:text-gray-400 transition-colors break-keep">
                           {item.title}
                         </h4>
                         {item.titleEn && (
