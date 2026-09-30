@@ -265,7 +265,7 @@ export default function Members() {
                     <div key={year} className="space-y-8">
                       {/* ⭐️ 소제목을 연도 숫자만 표시 (예: 2013) */}
                       <div className="border-b-2 border-black pb-2 mb-8">
-                        <h3 className="text-lg font-normal tracking-tight text-gray-500">
+                        <h3 className="text-lg font-normal tracking-tight text-gray-900">
                           {year === '미상' ? '입학년도 미상' : year}
                         </h3>
                       </div>
@@ -299,7 +299,7 @@ export default function Members() {
                                 <div className="flex justify-between items-start gap-4 mb-4">
                                   <div className="space-y-1">
                                     <h4 className="text-lg md:text-xl font-bold tracking-tight text-gray-900 group-hover:text-black transition-colors">{member.name}</h4>
-                                    <p className="text-xs font-medium text-gray-500">
+                                    <p className="text-[11px] font-medium text-gray-500">
                                       {getCategoryLabel(member.category || '')}
                                       {member.admissionMajor && (
                                         <span className="font-normal text-gray-400"> / {normalizeAdmissionMajor(member.admissionMajor)}</span>
@@ -307,7 +307,7 @@ export default function Members() {
                                     </p>
                                   </div>
                                   <div className="flex flex-col items-end gap-1.5 shrink-0 text-right">
-                                    <span className={`text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-xs text-right whitespace-nowrap ${
+                                    <span className={`text-[11px] font-bold tracking-wider px-2 py-0.5 rounded-xs text-right whitespace-nowrap ${
                                       member.status === 'graduate' 
                                         ? 'bg-amber-50 text-amber-800 border border-amber-200/60' 
                                         : member.status === 'completed'
@@ -326,8 +326,8 @@ export default function Members() {
 
                                 <div className="border-t border-gray-100 pt-4 space-y-3 flex-1">
                                   {member.email?.trim() && (
-                                    <div className="flex items-start gap-3 text-xs">
-                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[9px] mt-0.5">이메일</span>
+                                    <div className="flex items-start gap-3 text-[11px]">
+                                      <span className="w-16 shrink-0 font-bold text-gray-400 uppercase tracking-widest text-[11px] mt-0.5">이메일</span>
                                       <a href={`mailto:${member.email.trim()}`} className="text-gray-700 hover:text-black hover:underline break-all">{member.email.trim()}</a>
                                     </div>
                                   )}
