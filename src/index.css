@@ -34,6 +34,9 @@ html {
     /* 색상 설정이 없을 때 적용될 기본값 */
     --theme-color: #000000; 
     --bg-color: #ffffff;
+    
+    /* ⭐️ 1. 포인트 컬러 기본값 추가 */
+    --point-color: #000000; 
   }
 }
 
@@ -43,15 +46,18 @@ html {
   .text-theme { color: var(--theme-color) !important; }
   .border-theme { border-color: var(--theme-color) !important; }
 
-  /* Background Color (버튼, 가름선 등에 사용) ⭐️ 추가된 부분 */
+  /* Background Color (버튼, 가름선 등에 사용) */
   .bg-sitebg { background-color: var(--bg-color) !important; }
   .text-sitebg { color: var(--bg-color) !important; }
   .border-sitebg { border-color: var(--bg-color) !important; }
+
+  /* ⭐️ Point Color (스크롤 상단 버튼 등에 사용) 추가된 부분 */
+  .bg-point { background-color: var(--point-color) !important; }
+  .text-point { color: var(--point-color) !important; }
+  .border-point { border-color: var(--point-color) !important; }
 }
 
 @layer utilities {
-  /* ... (이전에 추가했던 .bg-theme 등의 코드 유지) ... */
-
   /* ==================================================
      ⭐️ 마법의 규칙: 가름선들만 자동으로 찾아 색상 덮어쓰기 
      ================================================== */
