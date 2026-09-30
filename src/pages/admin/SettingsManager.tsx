@@ -9,9 +9,12 @@ export default function SettingsManager() {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [pointColor, setPointColor] = useState('#000000');
   
-  // 배너 및 본문 이미지 상태 (다중 배너 지원을 위해 배열로 관리)
-  const [bannerImageUrls, setBannerImageUrls] = useState<string[]>([]);
+  // 1. 연구실 소개 페이지 배너 (단일)
+  const [bannerImageUrl, setBannerImageUrl] = useState('');
   const [bodyImageUrl, setBodyImageUrl] = useState('');
+
+  // 2. 홈페이지 첫 화면 배너들 (다중 지원)
+  const [homeBannerImageUrls, setHomeBannerImageUrls] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -24,6 +27,7 @@ export default function SettingsManager() {
 
   const fetchSettings = async () => {
     try {
+      // 색상 설정 (settings/site)
       const siteDocRef = doc(db, 'settings', 'site');
       const siteDocSnap = await getDoc(siteDocRef);
       if (siteDocSnap.exists()) {
@@ -33,17 +37,21 @@ export default function SettingsManager() {
         setPointColor(data.pointColor || '#000000');
       }
 
+      // 연구실 소개 배너 (settings/lab)
       const labDocRef = doc(db, 'settings', 'lab');
       const labDocSnap = await getDoc(labDocRef);
       if (labDocSnap.exists()) {
         const data = labDocSnap.data();
-        // 기존 단일 배너(bannerImageUrl)가 있다면 배열로 흡수하고, 신규 다중 배열(bannerImageUrls) 우선 사용
-        if (data.bannerImageUrls && Array.isArray(data.bannerImageUrls)) {
-          setBannerImageUrls(data.bannerImageUrls);
-        } else if (data.bannerImageUrl) {
-          setBannerImageUrls([data.bannerImageUrl]);
-        }
+        setBannerImageUrl(data.bannerImageUrl || '');
         setBodyImageUrl(data.bodyImageUrl || '');
+      }
+
+      // 홈페이지 첫 화면 배너 (settings/home)
+      const homeDocRef = doc(db, 'settings', 'home');
+      const homeDocSnap = await getDoc(homeDocRef);
+      if (homeDocSnap.exists()) {
+        const data = homeDocSnap.data();
+        setHomeBannerImageUrls(data.homeBannerImageUrls || []);
       }
     } catch (error) {
       console.error('설정 불러오기 실패:', error);
@@ -52,8 +60,8 @@ export default function SettingsManager() {
     }
   };
 
-  // ⭐️ 이미지 파일 업로드 핸들러 (10MB 미만 제한)
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'body') => {
+  // 이미지 파일 업로드 핸들러 (10MB 미만 제한)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'labBanner' | 'labBody' | 'homeBanner') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -66,21 +74,23 @@ export default function SettingsManager() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
 
-        // 10MB 용량 제한 체크 (10 * 1024 * 1024 bytes)
+        // 10MB 용량 제한 체크
         if (file.size > 10 * 1024 * 1024) {
           alert(`"${file.name}" 파일의 용량이 10MB를 초과합니다. 10MB 미만 이미지만 업로드 가능합니다.`);
           continue;
         }
 
-        const storageRef = ref(storage, `lab_images/${Date.now()}_${file.name}`);
+        const storageRef = ref(storage, `site_images/${Date.now()}_${file.name}`);
         const snapshot = await uploadBytes(storageRef, file);
         const downloadUrl = await getDownloadURL(snapshot.ref);
         newUrls.push(downloadUrl);
       }
 
-      if (type === 'banner') {
-        setBannerImageUrls((prev) => [...prev, ...newUrls]);
-      } else if (type === 'body' && newUrls.length > 0) {
+      if (target === 'homeBanner') {
+        setHomeBannerImageUrls((prev) => [...prev, ...newUrls]);
+      } else if (target === 'labBanner' && newUrls.length > 0) {
+        setBannerImageUrl(newUrls[0]);
+      } else if (target === 'labBody' && newUrls.length > 0) {
         setBodyImageUrl(newUrls[0]);
       }
 
@@ -90,13 +100,13 @@ export default function SettingsManager() {
       setMessage('이미지 업로드 중 오류가 발생했습니다.');
     } finally {
       setUploading(false);
-      e.target.value = ''; // input 초기화
+      e.target.value = '';
     }
   };
 
-  // ⭐️ 배너 이미지 개별 삭제 핸들러
-  const handleRemoveBannerImage = (index: number) => {
-    setBannerImageUrls((prev) => prev.filter((_, idx) => idx !== index));
+  // 홈페이지 첫 화면 배너 개별 삭제
+  const handleRemoveHomeBanner = (index: number) => {
+    setHomeBannerImageUrls((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -105,6 +115,7 @@ export default function SettingsManager() {
     setMessage('');
 
     try {
+      // 1. 색상 저장
       await setDoc(doc(db, 'settings', 'site'), {
         themeColor,
         backgroundColor,
@@ -112,14 +123,20 @@ export default function SettingsManager() {
         updatedAt: new Date()
       }, { merge: true });
 
+      // 2. 연구실 소개 배너 저장
       await setDoc(doc(db, 'settings', 'lab'), {
-        bannerImageUrls, // 여러 장의 배너 이미지 배열 저장
-        bannerImageUrl: bannerImageUrls[0] || '', // 하위 호환성 유지
+        bannerImageUrl,
         bodyImageUrl,
         updatedAt: new Date()
       }, { merge: true });
+
+      // 3. 홈페이지 첫 화면 배너 저장
+      await setDoc(doc(db, 'settings', 'home'), {
+        homeBannerImageUrls,
+        updatedAt: new Date()
+      }, { merge: true });
       
-      setMessage('사이트 및 배너 설정이 성공적으로 저장되었습니다.');
+      setMessage('모든 설정이 성공적으로 저장되었습니다.');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('설정 저장 실패:', error);
@@ -141,12 +158,12 @@ export default function SettingsManager() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <div className="border-b border-gray-100 pb-4">
         <h3 className="text-xl font-bold tracking-tight">사이트 설정</h3>
-        <p className="text-xs text-gray-400 mt-2">웹사이트 전역 테마 색상 및 연구실 소개 배너 이미지를 관리합니다.</p>
+        <p className="text-xs text-gray-400 mt-2">웹사이트 전역 테마 색상, 홈페이지 첫 화면 배너, 연구실 소개 이미지를 관리합니다.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-8 max-w-2xl">
         <div className="space-y-8">
-          {/* 컬러 테마 설정 */}
+          {/* 1. 컬러 테마 설정 */}
           <div className="space-y-6 pb-6 border-b border-gray-100">
             <h4 className="text-xs font-bold uppercase tracking-widest text-black">🎨 컬러 테마 설정</h4>
             
@@ -175,31 +192,27 @@ export default function SettingsManager() {
             </div>
           </div>
 
-          {/* ⭐️ 배너 및 본문 이미지 업로드 설정 */}
-          <div className="space-y-6">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-black">🖼️️ 소개 페이지 배너 이미지 설정 (다중 선택 가능, 10MB 미만)</h4>
-
-            {/* 다중 배너 이미지 업로드 영역 */}
-            <div className="space-y-4">
-              <label className="block text-sm font-bold text-gray-700 uppercase tracking-widest text-[10px]">상단 배너 이미지들 (여러 장 선택 가능)</label>
+          {/* 2. ⭐️ 홈페이지 첫 화면 배너 이미지 설정 (다중 선택, 10MB 미만, 삭제 기능) */}
+          <div className="space-y-6 pb-6 border-b border-gray-100">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-black">🏠 홈페이지 첫 화면 배너 이미지 (다중 선택 가능, 10MB 미만)</h4>
+            <div>
               <input
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={(e) => handleFileUpload(e, 'banner')}
+                onChange={(e) => handleFileUpload(e, 'homeBanner')}
                 className="w-full p-2 text-sm border border-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
               />
-              <p className="text-[11px] text-gray-400">10MB 미만의 이미지 파일만 업로드할 수 있습니다. 여러 장을 한 번에 선택할 수 있습니다.</p>
+              <p className="text-[11px] text-gray-400 mt-1">10MB 미만 이미지만 업로드 가능합니다. 여러 장을 선택하여 슬라이드나 목록으로 띄울 수 있습니다.</p>
 
-              {/* 업로드된 배너 이미지 미리보기 및 삭제 리스트 */}
-              {bannerImageUrls.length > 0 && (
-                <div className="grid grid-cols-3 gap-4 pt-2">
-                  {bannerImageUrls.map((url, idx) => (
-                    <div key={idx} className="relative group aspect-[4/3] bg-gray-100 border border-gray-200 rounded overflow-hidden">
-                      <img src={url} alt={`Banner ${idx + 1}`} className="w-full h-full object-cover" />
+              {homeBannerImageUrls.length > 0 && (
+                <div className="grid grid-cols-3 gap-4 pt-4">
+                  {homeBannerImageUrls.map((url, idx) => (
+                    <div key={idx} className="relative group aspect-[16/9] bg-gray-100 border border-gray-200 rounded overflow-hidden">
+                      <img src={url} alt={`Home Banner ${idx + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => handleRemoveBannerImage(idx)}
+                        onClick={() => handleRemoveHomeBanner(idx)}
                         className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-80 hover:opacity-100 transition-opacity cursor-pointer shadow"
                         title="이미지 삭제"
                       >
@@ -213,26 +226,40 @@ export default function SettingsManager() {
                 </div>
               )}
             </div>
+          </div>
 
-            {/* 본문 삽입 이미지 업로드 영역 */}
-            <div className="pt-4">
+          {/* 3. 연구실 소개 페이지 배너 이미지 설정 */}
+          <div className="space-y-6">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-black">🖼️ 연구실 소개 페이지 배너 이미지</h4>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">상단 배너 이미지 (단일)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e, 'labBanner')}
+                className="w-full p-2 text-sm border border-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
+              />
+              {bannerImageUrl && (
+                <div className="mt-3 relative w-32 aspect-[4/3] bg-gray-100 border border-gray-200 rounded overflow-hidden">
+                  <img src={bannerImageUrl} alt="Lab Banner" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => setBannerImageUrl('')} className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">✕</button>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2">
               <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-widest text-[10px]">본문 삽입 이미지 (단일)</label>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => handleFileUpload(e, 'body')}
+                onChange={(e) => handleFileUpload(e, 'labBody')}
                 className="w-full p-2 text-sm border border-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-black file:text-white hover:file:bg-gray-800 cursor-pointer"
               />
               {bodyImageUrl && (
                 <div className="mt-3 relative w-32 aspect-[16/10] bg-gray-100 border border-gray-200 rounded overflow-hidden">
                   <img src={bodyImageUrl} alt="Body" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setBodyImageUrl('')}
-                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]"
-                  >
-                    ✕
-                  </button>
+                  <button type="button" onClick={() => setBodyImageUrl('')} className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">✕</button>
                 </div>
               )}
             </div>
