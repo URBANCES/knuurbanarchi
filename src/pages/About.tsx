@@ -26,6 +26,10 @@ export default function About() {
   const [profData, setProfData] = useState<ProfessorData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // ⭐️ 각 섹션별 현재 페이지 번호를 관리하는 상태 (예: { 0: 1, 1: 2 })
+  const [sectionPages, setSectionPages] = useState<{ [key: number]: number }>({});
+  const ITEMS_PER_PAGE = 20; // 페이지당 표시할 항목 수
+
   useEffect(() => {
     const unsubInfo = onSnapshot(doc(db, 'settings', 'lab'), (snapshot) => {
       if (snapshot.exists()) {
@@ -45,6 +49,14 @@ export default function About() {
       unsubProf();
     };
   }, []);
+
+  // 페이지 변경 핸들러
+  const handlePageChange = (sectionIdx: number, newPage: number) => {
+    setSectionPages(prev => ({
+      ...prev,
+      [sectionIdx]: newPage
+    }));
+  };
 
   if (loading) {
     return (
@@ -77,7 +89,6 @@ export default function About() {
             {labInfo?.description || `도시건축연구실(Urban Architecture Lab)은 현대 도시가 직면한 복합적인 문제들을 건축적 시각에서 분석하고 해결책을 제시하는 연구 중심의 디자인 스튜디오입니다. 우리는 도시의 역사적 맥락과 미래의 기술적 변화 사이의 균형을 찾으며, 사람 중심의 지속 가능한 도시 환경을 구축하는 것을 목표로 합니다.`}
           </p>
 
-          {/* 본문 삽입 이미지 (Conditional Rendering) */}
           {labInfo?.bodyImageUrl && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -104,7 +115,7 @@ export default function About() {
         </div>
       </motion.section>
 
-      {/* Decorative Elegant Divider */}
+      {/* Decorative Elegant Divider (간격 슬림화 적용) */}
       <div className="border-t border-gray-100 my-16 md:my-20 relative">
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-8 text-[11px] font-bold tracking-[0.6em] text-gray-300 uppercase font-sans">
           Professor Profile
@@ -119,8 +130,7 @@ export default function About() {
           transition={{ duration: 0.8 }}
           className="space-y-24"
         >
-          {/* Header - Precise authoritative style */}
-          <div className="text-center space-y-3 mb-10">
+          <div className="text-center space-y-1 mb-1">
             <h4 className="text-[12px] font-bold tracking-[0.6em] uppercase text-gray-400 font-sans">도시 및 건축설계</h4>
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight uppercase font-sans">
               {profData.name} 교수
@@ -128,7 +138,7 @@ export default function About() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-32">
-            {/* Left: Profile & Key Specs (학력, 경력 등 주요 스펙) */}
+            {/* Left: Profile & Key Specs */}
             <div className="lg:col-span-4 space-y-12">
               <div className="aspect-square bg-gray-50 border border-gray-100 overflow-hidden">
                 {profData.image ? (
@@ -143,7 +153,6 @@ export default function About() {
                 )}
               </div>
 
-              {/* ⭐️ 주요 스펙 영역: '연도 | 내용' 형식이면 연도와 내용이 나뉘어 정렬되도록 개선 */}
               <div className="space-y-10">
                 {profData.specs?.map((spec, idx) => (
                   <div key={idx} className="space-y-2">
@@ -182,7 +191,6 @@ export default function About() {
 
             {/* Right: Detailed Records (Detailed Records Column) */}
             <div className="lg:col-span-8 space-y-12">
-              {/* Representative Greeting (Introduction) */}
               {profData.introduction && (
                 <div className="space-y-8 pb-8 border-b border-gray-100">
                   <div className="space-y-2">
@@ -198,33 +206,90 @@ export default function About() {
               )}
 
               <div className="space-y-24">
-                {profData.sections?.map((section, idx) => (
-                  <div key={idx} className="space-y-10">
-                    <div className="border-b border-black pb-4">
-                      <h3 className="text-lg font-bold tracking-widest uppercase font-sans">
-                        {section.title}
-                      </h3>
+                {profData.sections?.map((section, idx) => {
+                  const items = section.items || [];
+                  const currentPage = sectionPages[idx] || 1;
+                  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+                  
+                  // 현재 페이지에 해당하는 20개 아이템만 슬라이싱
+                  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                  const currentItems = items.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+                  return (
+                    <div key={idx} className="space-y-10">
+                      <div className="border-b border-black pb-4 flex justify-between items-end">
+                        <h3 className="text-lg font-bold tracking-widest uppercase font-sans">
+                          {section.title}
+                        </h3>
+                        {items.length > 0 && (
+                          <span className="text-[11px] text-gray-400 font-mono">
+                            Total {items.length} (Page {currentPage} / {totalPages || 1})
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-6 font-sans">
+                        <ul className="space-y-4">
+                          {currentItems.map((item, iIdx) => (
+                            <li key={iIdx} className="text-[14.5px] leading-[1.8] text-gray-600 font-light list-none">
+                              {item.includes('|') ? (
+                                <div className="flex gap-4">
+                                  <span className="font-bold text-black min-w-[60px]">{item.split('|')[0].trim()}</span>
+                                  <span>{item.split('|').slice(1).join('|').trim()}</span>
+                                </div>
+                              ) : item}
+                            </li>
+                          ))}
+                        </ul>
+
+                        {items.length === 0 && (
+                          <p className="text-[13px] text-gray-300 italic">등록된 이력이 없습니다.</p>
+                        )}
+
+                        {/* ⭐️ 페이지네이션 버튼 영역 (20개 초과할 때만 노출) */}
+                        {totalPages > 1 && (
+                          <div className="flex justify-center items-center gap-2 pt-6 border-t border-gray-50">
+                            <button
+                              onClick={() => handlePageChange(idx, currentPage - 1)}
+                              disabled={currentPage === 1}
+                              className="px-3 py-1 text-xs border border-gray-200 rounded disabled:opacity-30 hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                              Prev
+                            </button>
+                            
+                            <div className="flex gap-1">
+                              {Array.from({ length: totalPages }, (_, pIdx) => {
+                                const pageNum = pIdx + 1;
+                                const isSelected = pageNum === currentPage;
+                                return (
+                                  <button
+                                    key={pIdx}
+                                    onClick={() => handlePageChange(idx, pageNum)}
+                                    className={`w-7 h-7 text-xs font-bold rounded transition-colors cursor-pointer ${
+                                      isSelected 
+                                        ? 'bg-black text-white' 
+                                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <button
+                              onClick={() => handlePageChange(idx, currentPage + 1)}
+                              disabled={currentPage === totalPages}
+                              className="px-3 py-1 text-xs border border-gray-200 rounded disabled:opacity-30 hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    
-                    <div className="space-y-6 font-sans">
-                      <ul className="space-y-4">
-                        {section.items?.map((item, iIdx) => (
-                          <li key={iIdx} className="text-[14.5px] leading-[1.8] text-gray-600 font-light list-none">
-                            {item.includes('|') ? (
-                              <div className="flex gap-4">
-                                <span className="font-bold text-black min-w-[60px]">{item.split('|')[0].trim()}</span>
-                                <span>{item.split('|').slice(1).join('|').trim()}</span>
-                              </div>
-                            ) : item}
-                          </li>
-                        ))}
-                      </ul>
-                      {(!section.items || section.items.length === 0) && (
-                        <p className="text-[13px] text-gray-300 italic">등록된 이력이 없습니다.</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
