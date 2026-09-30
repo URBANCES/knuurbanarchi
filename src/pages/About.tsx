@@ -28,7 +28,7 @@ export default function About() {
 
   // ⭐️ 각 섹션별 현재 페이지 번호를 관리하는 상태 (예: { 0: 1, 1: 2 })
   const [sectionPages, setSectionPages] = useState<{ [key: number]: number }>({});
-  const ITEMS_PER_PAGE = 20; // 페이지당 표시할 항목 수
+  const ITEMS_PER_PAGE = 40; // 페이지당 표시할 항목 수
 
   useEffect(() => {
     const unsubInfo = onSnapshot(doc(db, 'settings', 'lab'), (snapshot) => {
@@ -211,7 +211,7 @@ export default function About() {
                   const currentPage = sectionPages[idx] || 1;
                   const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
                   
-                  // 현재 페이지에 해당하는 20개 아이템만 슬라이싱
+                  // 현재 페이지에 해당하는 40개 아이템만 슬라이싱
                   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
                   const currentItems = items.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
@@ -246,7 +246,7 @@ export default function About() {
                           <p className="text-[13px] text-gray-300 italic">등록된 이력이 없습니다.</p>
                         )}
 
-                        {/* ⭐️ 페이지네이션 버튼 영역 (20개 초과할 때만 노출) */}
+                        {/* ⭐️ 페이지네이션 버튼 영역 (40개 초과할 때만 노출) */}
                         {totalPages > 1 && (
                           <div className="flex justify-center items-center gap-2 pt-6 border-t border-gray-50">
                             <button
