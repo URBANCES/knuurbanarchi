@@ -130,7 +130,7 @@ export default function About() {
           transition={{ duration: 0.8 }}
           className="space-y-24"
         >
-          <div className="text-center space-y-1 mb-1">
+          <div className="text-center space-y-2 mb-4">
             <h4 className="text-[12px] font-bold tracking-[0.6em] uppercase text-gray-400 font-sans">도시 및 건축설계</h4>
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight uppercase font-sans">
               {profData.name} 교수
