@@ -241,7 +241,7 @@ export default function Header() {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25, ease: 'easeInOut' }}
-              className="absolute left-0 w-full bg-black text-white overflow-hidden z-[99] shadow-lg"
+              className="absolute left-0 w-full bg-theme text-white overflow-hidden z-[99] shadow-lg"
             >
               <div className="max-w-7xl mx-auto px-6 py-6">
                 <div className="flex justify-center gap-12 md:gap-16">
